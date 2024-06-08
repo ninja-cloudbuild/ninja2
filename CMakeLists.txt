@@ -118,6 +118,13 @@ set(NINJA_PYTHON "python" CACHE STRING "Python interpreter to use for the browse
 
 check_platform_supports_browse_mode(platform_supports_ninja_browse)
 
+if(NOT WIN32)
+	add_compile_definitions(USE_PPOLL)
+	add_compile_definitions(CLOUD_BUILD_SUPPORT)
+	add_subdirectory(src/remote_executor)
+endif()
+
+
 # Core source files all build into ninja library.
 add_library(libninja OBJECT
 	src/build_log.cc
@@ -159,7 +166,11 @@ if(WIN32)
 	# compiler may build ninja.
 	set_source_files_properties(src/getopt.c PROPERTIES LANGUAGE CXX)
 else()
-	target_sources(libninja PRIVATE src/subprocess-posix.cc)
+	target_sources(libninja PRIVATE
+	src/remote_process.cc
+	src/subprocess-posix.cc
+	src/thread_pool.cc
+	)
 	if(CMAKE_SYSTEM_NAME STREQUAL "OS400" OR CMAKE_SYSTEM_NAME STREQUAL "AIX")
 		target_sources(libninja PRIVATE src/getopt.c)
 		# Build getopt.c, which can be compiled as either C or C++, as C++
@@ -175,6 +186,11 @@ else()
 endif()
 
 target_compile_features(libninja PUBLIC cxx_std_11)
+
+if(NOT WIN32)
+	target_link_libraries(libninja PUBLIC remote_executor)
+	add_dependencies(libninja remote_executor)
+endif()
 
 #Fixes GetActiveProcessorCount on MinGW
 if(MINGW)
