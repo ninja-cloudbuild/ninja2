@@ -34,6 +34,13 @@ struct Node;
 struct State;
 struct Status;
 
+
+struct EdgeWork {
+  Edge* edge;
+  bool remote; // Can run remotely, only valid in cloud build mode.
+};
+
+
 /// Plan stores the state of a build plan: what we intend to build,
 /// which steps we're ready to execute.
 struct Plan {
@@ -46,7 +53,8 @@ struct Plan {
 
   // Pop a ready edge off the queue of edges to build.
   // Returns NULL if there's no work to do.
-  Edge* FindWork();
+  /// @param mode 0 local, 1 remote, other local/remote
+  EdgeWork FindWork(unsigned mode = 0);
 
   /// Returns true if there's more work to be done.
   bool more_to_do() const { return wanted_edges_ > 0 && command_edges_ > 0; }
@@ -128,6 +136,8 @@ private:
   std::map<Edge*, Want> want_;
 
   EdgePriorityQueue ready_;
+  EdgePriorityQueue local_ready_;
+
 
   Builder* builder_;
   /// user provided targets in build order, earlier one have higher priority
@@ -146,7 +156,9 @@ private:
 struct CommandRunner {
   virtual ~CommandRunner() {}
   virtual size_t CanRunMore() const = 0;
-  virtual bool StartCommand(Edge* edge) = 0;
+  virtual unsigned CommandMode() { return 0; }
+  virtual bool StartCommand(const EdgeWork& work) = 0;
+
 
   /// The result of waiting for a command.
   struct Result {
@@ -165,7 +177,7 @@ struct CommandRunner {
 
 /// Options (e.g. verbosity, parallelism) passed to a build.
 struct BuildConfig {
-  BuildConfig() : verbosity(NORMAL), dry_run(false), parallelism(1),
+  BuildConfig() : verbosity(NORMAL), dry_run(false), parallelism(1), cloud_build(false),
                   failures_allowed(1), max_load_average(-0.0f) {}
 
   enum Verbosity {
@@ -176,6 +188,10 @@ struct BuildConfig {
   };
   Verbosity verbosity;
   bool dry_run;
+  bool cloud_build;
+  std::string grpc_url;
+  std::string cwd;
+  std::string project_root;
   int parallelism;
   int failures_allowed;
   /// The maximum load average we must not exceed. A negative value
@@ -208,7 +224,7 @@ struct Builder {
   /// It is an error to call this function when AlreadyUpToDate() is true.
   bool Build(std::string* err);
 
-  bool StartEdge(Edge* edge, std::string* err);
+  bool StartEdge(const EdgeWork& edge, std::string* err);
 
   /// Update status ninja logs following a command termination.
   /// @return false if the build can not proceed further due to a fatal error.

@@ -44,11 +44,11 @@ struct PlanTest : public StateTestWithBuiltinRules {
   void FindWorkSorted(deque<Edge*>* ret, int count) {
     for (int i = 0; i < count; ++i) {
       ASSERT_TRUE(plan_.more_to_do());
-      Edge* edge = plan_.FindWork();
+      Edge* edge = plan_.FindWork().edge;
       ASSERT_TRUE(edge);
       ret->push_back(edge);
     }
-    ASSERT_FALSE(plan_.FindWork());
+    ASSERT_FALSE(plan_.FindWork().edge);
     sort(ret->begin(), ret->end(), CompareEdgesByOutput::cmp);
   }
 
@@ -71,18 +71,18 @@ TEST_F(PlanTest, Basic) {
   GetNode("out")->MarkDirty();
   PrepareForTarget("out");
 
-  Edge* edge = plan_.FindWork();
+  Edge* edge = plan_.FindWork().edge;
   ASSERT_TRUE(edge);
   ASSERT_EQ("in",  edge->inputs_[0]->path());
   ASSERT_EQ("mid", edge->outputs_[0]->path());
 
-  ASSERT_FALSE(plan_.FindWork());
+  ASSERT_FALSE(plan_.FindWork().edge);
 
   string err;
   plan_.EdgeFinished(edge, Plan::kEdgeSucceeded, &err);
   ASSERT_EQ("", err);
 
-  edge = plan_.FindWork();
+  edge = plan_.FindWork().edge;
   ASSERT_TRUE(edge);
   ASSERT_EQ("mid", edge->inputs_[0]->path());
   ASSERT_EQ("out", edge->outputs_[0]->path());
@@ -91,7 +91,7 @@ TEST_F(PlanTest, Basic) {
   ASSERT_EQ("", err);
 
   ASSERT_FALSE(plan_.more_to_do());
-  edge = plan_.FindWork();
+  edge = plan_.FindWork().edge;
   ASSERT_EQ(0, edge);
 }
 
@@ -106,18 +106,18 @@ TEST_F(PlanTest, DoubleOutputDirect) {
   PrepareForTarget("out");
 
   Edge* edge;
-  edge = plan_.FindWork();
+  edge = plan_.FindWork().edge;
   ASSERT_TRUE(edge);  // cat in
   string err;
   plan_.EdgeFinished(edge, Plan::kEdgeSucceeded, &err);
   ASSERT_EQ("", err);
 
-  edge = plan_.FindWork();
+  edge = plan_.FindWork().edge;
   ASSERT_TRUE(edge);  // cat mid1 mid2
   plan_.EdgeFinished(edge, Plan::kEdgeSucceeded, &err);
   ASSERT_EQ("", err);
 
-  edge = plan_.FindWork();
+  edge = plan_.FindWork().edge;
   ASSERT_FALSE(edge);  // done
 }
 
@@ -136,28 +136,28 @@ TEST_F(PlanTest, DoubleOutputIndirect) {
   PrepareForTarget("out");
 
   Edge* edge;
-  edge = plan_.FindWork();
+  edge = plan_.FindWork().edge;
   ASSERT_TRUE(edge);  // cat in
   string err;
   plan_.EdgeFinished(edge, Plan::kEdgeSucceeded, &err);
   ASSERT_EQ("", err);
 
-  edge = plan_.FindWork();
+  edge = plan_.FindWork().edge;
   ASSERT_TRUE(edge);  // cat a1
   plan_.EdgeFinished(edge, Plan::kEdgeSucceeded, &err);
   ASSERT_EQ("", err);
 
-  edge = plan_.FindWork();
+  edge = plan_.FindWork().edge;
   ASSERT_TRUE(edge);  // cat a2
   plan_.EdgeFinished(edge, Plan::kEdgeSucceeded, &err);
   ASSERT_EQ("", err);
 
-  edge = plan_.FindWork();
+  edge = plan_.FindWork().edge;
   ASSERT_TRUE(edge);  // cat b1 b2
   plan_.EdgeFinished(edge, Plan::kEdgeSucceeded, &err);
   ASSERT_EQ("", err);
 
-  edge = plan_.FindWork();
+  edge = plan_.FindWork().edge;
   ASSERT_FALSE(edge);  // done
 }
 
@@ -175,28 +175,28 @@ TEST_F(PlanTest, DoubleDependent) {
   PrepareForTarget("out");
 
   Edge* edge;
-  edge = plan_.FindWork();
+  edge = plan_.FindWork().edge;
   ASSERT_TRUE(edge);  // cat in
   string err;
   plan_.EdgeFinished(edge, Plan::kEdgeSucceeded, &err);
   ASSERT_EQ("", err);
 
-  edge = plan_.FindWork();
+  edge = plan_.FindWork().edge;
   ASSERT_TRUE(edge);  // cat mid
   plan_.EdgeFinished(edge, Plan::kEdgeSucceeded, &err);
   ASSERT_EQ("", err);
 
-  edge = plan_.FindWork();
+  edge = plan_.FindWork().edge;
   ASSERT_TRUE(edge);  // cat mid
   plan_.EdgeFinished(edge, Plan::kEdgeSucceeded, &err);
   ASSERT_EQ("", err);
 
-  edge = plan_.FindWork();
+  edge = plan_.FindWork().edge;
   ASSERT_TRUE(edge);  // cat a1 a2
   plan_.EdgeFinished(edge, Plan::kEdgeSucceeded, &err);
   ASSERT_EQ("", err);
 
-  edge = plan_.FindWork();
+  edge = plan_.FindWork().edge;
   ASSERT_FALSE(edge);  // done
 }
 
@@ -212,29 +212,29 @@ void PlanTest::TestPoolWithDepthOne(const char* test_case) {
   plan_.PrepareQueue();
   ASSERT_TRUE(plan_.more_to_do());
 
-  Edge* edge = plan_.FindWork();
+  Edge* edge = plan_.FindWork().edge;
   ASSERT_TRUE(edge);
   ASSERT_EQ("in",  edge->inputs_[0]->path());
   ASSERT_EQ("out1", edge->outputs_[0]->path());
 
   // This will be false since poolcat is serialized
-  ASSERT_FALSE(plan_.FindWork());
+  ASSERT_FALSE(plan_.FindWork().edge);
 
   plan_.EdgeFinished(edge, Plan::kEdgeSucceeded, &err);
   ASSERT_EQ("", err);
 
-  edge = plan_.FindWork();
+  edge = plan_.FindWork().edge;
   ASSERT_TRUE(edge);
   ASSERT_EQ("in", edge->inputs_[0]->path());
   ASSERT_EQ("out2", edge->outputs_[0]->path());
 
-  ASSERT_FALSE(plan_.FindWork());
+  ASSERT_FALSE(plan_.FindWork().edge);
 
   plan_.EdgeFinished(edge, Plan::kEdgeSucceeded, &err);
   ASSERT_EQ("", err);
 
   ASSERT_FALSE(plan_.more_to_do());
-  edge = plan_.FindWork();
+  edge = plan_.FindWork().edge;
   ASSERT_EQ(0, edge);
 }
 
@@ -310,24 +310,24 @@ TEST_F(PlanTest, PoolsWithDepthTwo) {
   edges.pop_front();
 
   // out3 should be available
-  Edge* out3 = plan_.FindWork();
+  Edge* out3 = plan_.FindWork().edge;
   ASSERT_TRUE(out3);
   ASSERT_EQ("in",  out3->inputs_[0]->path());
   ASSERT_EQ("out3", out3->outputs_[0]->path());
 
-  ASSERT_FALSE(plan_.FindWork());
+  ASSERT_FALSE(plan_.FindWork().edge);
 
   plan_.EdgeFinished(out3, Plan::kEdgeSucceeded, &err);
   ASSERT_EQ("", err);
 
-  ASSERT_FALSE(plan_.FindWork());
+  ASSERT_FALSE(plan_.FindWork().edge);
 
   for (deque<Edge*>::iterator it = edges.begin(); it != edges.end(); ++it) {
     plan_.EdgeFinished(*it, Plan::kEdgeSucceeded, &err);
     ASSERT_EQ("", err);
   }
 
-  Edge* last = plan_.FindWork();
+  Edge* last = plan_.FindWork().edge;
   ASSERT_TRUE(last);
   ASSERT_EQ("allTheThings", last->outputs_[0]->path());
 
@@ -335,7 +335,7 @@ TEST_F(PlanTest, PoolsWithDepthTwo) {
   ASSERT_EQ("", err);
 
   ASSERT_FALSE(plan_.more_to_do());
-  ASSERT_FALSE(plan_.FindWork());
+  ASSERT_FALSE(plan_.FindWork().edge);
 }
 
 TEST_F(PlanTest, PoolWithRedundantEdges) {
@@ -375,9 +375,9 @@ TEST_F(PlanTest, PoolWithRedundantEdges) {
   plan_.EdgeFinished(edge, Plan::kEdgeSucceeded, &err);
   ASSERT_EQ("", err);
 
-  edge = plan_.FindWork();
+  edge = plan_.FindWork().edge;
   ASSERT_TRUE(edge);
-  ASSERT_FALSE(plan_.FindWork());
+  ASSERT_FALSE(plan_.FindWork().edge);
   ASSERT_EQ("foo.cpp", edge->inputs_[0]->path());
   ASSERT_EQ("foo.cpp", edge->inputs_[1]->path());
   ASSERT_EQ("foo.cpp.obj", edge->outputs_[0]->path());
@@ -389,33 +389,33 @@ TEST_F(PlanTest, PoolWithRedundantEdges) {
   plan_.EdgeFinished(edge, Plan::kEdgeSucceeded, &err);
   ASSERT_EQ("", err);
 
-  edge = plan_.FindWork();
+  edge = plan_.FindWork().edge;
   ASSERT_TRUE(edge);
-  ASSERT_FALSE(plan_.FindWork());
+  ASSERT_FALSE(plan_.FindWork().edge);
   ASSERT_EQ("bar.cpp", edge->inputs_[0]->path());
   ASSERT_EQ("bar.cpp", edge->inputs_[1]->path());
   ASSERT_EQ("bar.cpp.obj", edge->outputs_[0]->path());
   plan_.EdgeFinished(edge, Plan::kEdgeSucceeded, &err);
   ASSERT_EQ("", err);
 
-  edge = plan_.FindWork();
+  edge = plan_.FindWork().edge;
   ASSERT_TRUE(edge);
-  ASSERT_FALSE(plan_.FindWork());
+  ASSERT_FALSE(plan_.FindWork().edge);
   ASSERT_EQ("foo.cpp.obj", edge->inputs_[0]->path());
   ASSERT_EQ("bar.cpp.obj", edge->inputs_[1]->path());
   ASSERT_EQ("libfoo.a", edge->outputs_[0]->path());
   plan_.EdgeFinished(edge, Plan::kEdgeSucceeded, &err);
   ASSERT_EQ("", err);
 
-  edge = plan_.FindWork();
+  edge = plan_.FindWork().edge;
   ASSERT_TRUE(edge);
-  ASSERT_FALSE(plan_.FindWork());
+  ASSERT_FALSE(plan_.FindWork().edge);
   ASSERT_EQ("libfoo.a", edge->inputs_[0]->path());
   ASSERT_EQ("all", edge->outputs_[0]->path());
   plan_.EdgeFinished(edge, Plan::kEdgeSucceeded, &err);
   ASSERT_EQ("", err);
 
-  edge = plan_.FindWork();
+  edge = plan_.FindWork().edge;
   ASSERT_FALSE(edge);
   ASSERT_FALSE(plan_.more_to_do());
 }
@@ -439,29 +439,29 @@ TEST_F(PlanTest, PoolWithFailingEdge) {
   plan_.PrepareQueue();
   ASSERT_TRUE(plan_.more_to_do());
 
-  Edge* edge = plan_.FindWork();
+  Edge* edge = plan_.FindWork().edge;
   ASSERT_TRUE(edge);
   ASSERT_EQ("in",  edge->inputs_[0]->path());
   ASSERT_EQ("out1", edge->outputs_[0]->path());
 
   // This will be false since poolcat is serialized
-  ASSERT_FALSE(plan_.FindWork());
+  ASSERT_FALSE(plan_.FindWork().edge);
 
   plan_.EdgeFinished(edge, Plan::kEdgeFailed, &err);
   ASSERT_EQ("", err);
 
-  edge = plan_.FindWork();
+  edge = plan_.FindWork().edge;
   ASSERT_TRUE(edge);
   ASSERT_EQ("in", edge->inputs_[0]->path());
   ASSERT_EQ("out2", edge->outputs_[0]->path());
 
-  ASSERT_FALSE(plan_.FindWork());
+  ASSERT_FALSE(plan_.FindWork().edge);
 
   plan_.EdgeFinished(edge, Plan::kEdgeFailed, &err);
   ASSERT_EQ("", err);
 
   ASSERT_TRUE(plan_.more_to_do()); // Jobs have failed
-  edge = plan_.FindWork();
+  edge = plan_.FindWork().edge;
   ASSERT_EQ(0, edge);
 }
 
@@ -503,7 +503,7 @@ TEST_F(PlanTest, PriorityWithoutBuildLog) {
   const char *expected_order[n_edges] = {
     "a1", "a0", "b0", "c0", "out"};
   for (int i = 0; i < n_edges; ++i) {
-    Edge* edge = plan_.FindWork();
+    Edge* edge = plan_.FindWork().edge;
     ASSERT_TRUE(edge != nullptr);
     EXPECT_EQ(expected_order[i], edge->outputs_[0]->path());
 
@@ -512,7 +512,7 @@ TEST_F(PlanTest, PriorityWithoutBuildLog) {
     EXPECT_EQ(err, "");
   }
 
-  EXPECT_FALSE(plan_.FindWork());
+  EXPECT_FALSE(plan_.FindWork().edge);
 }
 
 /// Fake implementation of CommandRunner, useful for tests.
@@ -522,7 +522,7 @@ struct FakeCommandRunner : public CommandRunner {
 
   // CommandRunner impl
   virtual size_t CanRunMore() const;
-  virtual bool StartCommand(Edge* edge);
+  virtual bool StartCommand(const EdgeWork& work);
   virtual bool WaitForCommand(Result* result);
   virtual vector<Edge*> GetActiveEdges();
   virtual void Abort();
@@ -629,8 +629,9 @@ size_t FakeCommandRunner::CanRunMore() const {
   return 0;
 }
 
-bool FakeCommandRunner::StartCommand(Edge* edge) {
+bool FakeCommandRunner::StartCommand(const EdgeWork& work) {
   assert(active_edges_.size() < max_active_edges_);
+  auto edge=work.edge;
   assert(find(active_edges_.begin(), active_edges_.end(), edge)
          == active_edges_.end());
   commands_ran_.push_back(edge->EvaluateCommand());

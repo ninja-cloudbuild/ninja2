@@ -39,6 +39,10 @@
 #include "subprocess.h"
 #include "util.h"
 
+#ifdef CLOUD_BUILD_SUPPORT
+#include "remote_process.h"
+#endif
+
 using namespace std;
 
 namespace {
@@ -49,7 +53,7 @@ struct DryRunCommandRunner : public CommandRunner {
 
   // Overridden from CommandRunner:
   virtual size_t CanRunMore() const;
-  virtual bool StartCommand(Edge* edge);
+  virtual bool StartCommand(const EdgeWork& work);
   virtual bool WaitForCommand(Result* result);
 
  private:
@@ -60,8 +64,8 @@ size_t DryRunCommandRunner::CanRunMore() const {
   return SIZE_MAX;
 }
 
-bool DryRunCommandRunner::StartCommand(Edge* edge) {
-  finished_.push(edge);
+bool DryRunCommandRunner::StartCommand(const EdgeWork& work) {
+  finished_.push(work.edge);
   return true;
 }
 
@@ -157,13 +161,36 @@ void Plan::EdgeWanted(const Edge* edge) {
   }
 }
 
-Edge* Plan::FindWork() {
+EdgeWork Plan::FindWork(unsigned mode) {
+#ifdef CLOUD_BUILD_SUPPORT
+  if ((mode == 0 || ready_.empty()) && !local_ready_.empty()) { //local
+    auto e = local_ready_.top();
+    local_ready_.pop();
+    return { e, false };
+  }
   if (ready_.empty())
-    return NULL;
-
-  Edge* work = ready_.top();
+    return { nullptr, false };
+  Edge* edge = ready_.top();
   ready_.pop();
-  return work;
+  if (mode == 0) //local
+    return { edge, false };
+  bool remote = RemoteExecutor::RemoteSpawn::CanExecuteRemotelly(edge);
+  if (mode > 1) //local or remote
+    return { edge, remote };
+  while (!remote && !ready_.empty()) { //remote needed
+    local_ready_.push(edge);
+    edge = ready_.top();
+    ready_.pop();
+    remote = RemoteExecutor::RemoteSpawn::CanExecuteRemotelly(edge);
+  }
+  return { edge, remote };
+#else
+  if (ready_.empty())
+    return { nullptr, false };
+  Edge* edge = ready_.top();
+  ready_.pop();
+  return { edge, false};
+#endif
 }
 
 void Plan::ScheduleWork(map<Edge*, Want>::iterator want_e) {
@@ -273,12 +300,9 @@ bool Plan::CleanNode(DependencyScan* scan, Node* node, string* err) {
     vector<Node*>::iterator
         begin = (*oe)->inputs_.begin(),
         end = (*oe)->inputs_.end() - (*oe)->order_only_deps_;
-#if __cplusplus < 201703L
-#define MEM_FN mem_fun
-#else
-#define MEM_FN mem_fn  // mem_fun was removed in C++17.
-#endif
-    if (find_if(begin, end, MEM_FN(&Node::dirty)) == end) {
+
+
+    if (find_if(begin, end, mem_fn(&Node::dirty)) == end) {
       // Recompute most_recent_input.
       Node* most_recent_input = NULL;
       for (vector<Node*>::iterator i = begin; i != end; ++i) {
@@ -578,7 +602,7 @@ struct RealCommandRunner : public CommandRunner {
   explicit RealCommandRunner(const BuildConfig& config) : config_(config) {}
   virtual ~RealCommandRunner() {}
   virtual size_t CanRunMore() const;
-  virtual bool StartCommand(Edge* edge);
+  virtual bool StartCommand(const EdgeWork& edge);
   virtual bool WaitForCommand(Result* result);
   virtual vector<Edge*> GetActiveEdges();
   virtual void Abort();
@@ -622,12 +646,12 @@ size_t RealCommandRunner::CanRunMore() const {
   return capacity;
 }
 
-bool RealCommandRunner::StartCommand(Edge* edge) {
-  string command = edge->EvaluateCommand();
-  Subprocess* subproc = subprocs_.Add(command, edge->use_console());
+bool RealCommandRunner::StartCommand(const EdgeWork& work) {
+  string command = work.edge->EvaluateCommand();
+  Subprocess* subproc = subprocs_.Add(command, work.edge->use_console());
   if (!subproc)
     return false;
-  subproc_to_edge_.insert(make_pair(subproc, edge));
+  subproc_to_edge_.insert(make_pair(subproc, work.edge));
 
   return true;
 }
@@ -650,6 +674,100 @@ bool RealCommandRunner::WaitForCommand(Result* result) {
   delete subproc;
   return true;
 }
+#ifdef CLOUD_BUILD_SUPPORT
+
+constexpr int proportion = 30; //Best result from benchmark
+
+struct CloudCommandRunner : public CommandRunner {
+  explicit CloudCommandRunner(const BuildConfig& config)
+      : config_(config), busyStatus(NO_BUSY),
+        local_runner(new RealCommandRunner(config)),
+        remote_procs_(config.parallelism * proportion) {}
+  virtual ~CloudCommandRunner() {}
+  virtual size_t CanRunMore() const;
+  /// Allow change command type by runner status
+  /// @return 0 local, 1 remote, 2 local/remote
+  virtual unsigned CommandMode() { return 2 - busyStatus; }
+  virtual bool StartCommand(const EdgeWork& work);
+  virtual bool WaitForCommand(Result* result);
+  virtual vector<Edge*> GetActiveEdges();
+  virtual void Abort();
+
+  enum { NO_BUSY = 0, LOCAL_BUSY = 1, REMOTE_BUSY = 2, ALL_BUSY = 3 };
+  const BuildConfig& config_;
+  mutable unsigned busyStatus;
+  std::unique_ptr<RealCommandRunner> local_runner;
+  RemoteProcessSet remote_procs_;
+  map<const RemoteProcess*, Edge*> remoteproc_to_edge;
+};
+
+size_t CloudCommandRunner::CanRunMore() const{
+  busyStatus = local_runner->CanRunMore()>0 ? 0 : LOCAL_BUSY;
+  if (remote_procs_.ThreadPoolAlreadyFull())
+    busyStatus |= REMOTE_BUSY;
+    if(busyStatus != ALL_BUSY)
+    return 1;
+    return 0;
+}
+
+bool CloudCommandRunner::StartCommand(const EdgeWork& work) {
+  if (!work.remote)
+    return local_runner->StartCommand(work);
+  EdgeCommand c;
+  work.edge->EvaluateCommand(&c);
+  string command = c.command;
+  auto spawn = RemoteExecutor::RemoteSpawn::CreateRemoteSpawn(work.edge);
+  RemoteProcess* remoteproc = remote_procs_.Add(spawn);
+  if (!remoteproc)
+    return false;
+  remoteproc_to_edge.insert(make_pair(remoteproc, work.edge));
+  return true;
+}
+
+bool CloudCommandRunner::WaitForCommand(Result* result) {
+  Subprocess* subproc;
+  RemoteProcess* remoteproc;
+  while (true) {
+    if ((subproc = local_runner->subprocs_.NextFinished()) != NULL)
+      break;
+    if ((remoteproc = remote_procs_.NextFinished()) != NULL)
+      break;
+    if (remote_procs_.DoWork(&local_runner->subprocs_))
+      return false;
+  }
+  if (subproc) {
+    result->status = subproc->Finish();
+#ifndef _WIN32
+    result->rusage = *subproc->GetUsage();
+#endif
+    result->output = subproc->GetOutput();
+    auto e = local_runner->subproc_to_edge_.find(subproc);
+    result->edge = e->second;
+    local_runner->subproc_to_edge_.erase(e);
+    delete subproc;
+    return true;
+  }
+  assert(remoteproc != NULL);
+  result->status = remoteproc->Finish();
+  result->output = remoteproc->GetOutput();
+  auto e = remoteproc_to_edge.find(remoteproc);
+  result->edge = e->second;
+  remoteproc_to_edge.erase(e);
+  delete remoteproc;
+  return true;
+}
+
+vector<Edge*> CloudCommandRunner::GetActiveEdges() {
+  return local_runner->GetActiveEdges();
+}
+
+void CloudCommandRunner::Abort() {
+  local_runner->Abort();
+  remote_procs_.Clear();
+}
+
+#endif // CLOUD_BUILD_SUPPORT
+
 
 Builder::Builder(State* state, const BuildConfig& config,
                  BuildLog* build_log, DepsLog* deps_log,
@@ -756,6 +874,12 @@ bool Builder::Build(string* err) {
   if (!command_runner_.get()) {
     if (config_.dry_run)
       command_runner_.reset(new DryRunCommandRunner);
+#ifdef CLOUD_BUILD_SUPPORT
+    else if (config_.cloud_build) {
+      RemoteExecutor::RemoteSpawn::config = &config_;
+      command_runner_.reset(new CloudCommandRunner(config_));
+    }
+#endif
     else
       command_runner_.reset(new RealCommandRunner(config_));
   }
@@ -771,9 +895,38 @@ bool Builder::Build(string* err) {
   while (plan_.more_to_do()) {
     // See if we can start any more commands.
     if (failures_allowed) {
+      if(config_.cloud_build && command_runner_->CanRunMore() > 0){
+       auto work = plan_.FindWork(command_runner_->CommandMode());
+      if (Edge* edge = work.edge) {
+        if (edge->GetBindingBool("generator")) {
+          scan_.build_log()->Close();
+        }
+
+        if (!StartEdge(work, err)) {
+          Cleanup();
+          status_->BuildFinished();
+          return false;
+        }
+
+        if (edge->is_phony()) {
+          if (!plan_.EdgeFinished(edge, Plan::kEdgeSucceeded, err)) {
+            Cleanup();
+            status_->BuildFinished();
+            return false;
+          }
+        } else {
+          ++pending_commands;
+        }
+
+        // We made some progress; go back to the main loop.
+        continue;
+      }
+      }
+      else{
       size_t capacity = command_runner_->CanRunMore();
       while (capacity > 0) {
-        Edge* edge = plan_.FindWork();
+        auto work = plan_.FindWork(command_runner_->CommandMode());
+        Edge* edge=work.edge;
         if (!edge)
           break;
 
@@ -781,7 +934,7 @@ bool Builder::Build(string* err) {
           scan_.build_log()->Close();
         }
 
-        if (!StartEdge(edge, err)) {
+        if (!StartEdge(work, err)) {
           Cleanup();
           status_->BuildFinished();
           return false;
@@ -804,10 +957,12 @@ bool Builder::Build(string* err) {
             capacity = current_capacity;
         }
       }
+      
 
        // We are finished with all work items and have no pending
        // commands. Therefore, break out of the main loop.
        if (pending_commands == 0 && !plan_.more_to_do()) break;
+      }
     }
 
     // See if we can reap any finished commands.
@@ -856,8 +1011,9 @@ bool Builder::Build(string* err) {
   return true;
 }
 
-bool Builder::StartEdge(Edge* edge, string* err) {
+bool Builder::StartEdge(const EdgeWork& work, string* err) {
   METRIC_RECORD("StartEdge");
+  Edge* edge=work.edge;
   if (edge->is_phony())
     return true;
 
@@ -895,7 +1051,7 @@ bool Builder::StartEdge(Edge* edge, string* err) {
   }
 
   // start command computing and run it
-  if (!command_runner_->StartCommand(edge)) {
+  if (!command_runner_->StartCommand(work)) {
     err->assign("command '" + edge->EvaluateCommand() + "' failed.");
     return false;
   }
