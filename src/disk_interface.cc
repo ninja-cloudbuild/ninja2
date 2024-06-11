@@ -355,6 +355,22 @@ void RealDiskInterface::AllowStatCache(bool allow) {
 #endif
 }
 
+bool GetCurrentDirectory(std::string* out_path, std::string* err) {
+  vector<char> cwd;
+  do {
+    cwd.resize(cwd.size() + 1024);
+    errno = 0;
+  } while (!::getcwd(&cwd[0], cwd.size()) && errno == ERANGE);
+  if (errno == 0) {
+    out_path->assign(&cwd[0]);
+    err->clear();
+    return true;
+  }
+  *err = "getcwd failed: ";
+  *err += strerror(errno);
+  return false;
+}
+
 #ifdef _WIN32
 bool RealDiskInterface::AreLongPathsEnabled(void) const {
   return long_paths_enabled_;

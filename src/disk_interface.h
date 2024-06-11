@@ -66,7 +66,8 @@ struct DiskInterface: public FileReader {
   /// `basename path`.
   bool MakeDirs(const std::string& path);
 };
-
+  bool GetCurrentDirectory(std::string* out_path, std::string* err);
+  
 /// Implementation of DiskInterface that actually hits the disk.
 struct RealDiskInterface : public DiskInterface {
   RealDiskInterface();
