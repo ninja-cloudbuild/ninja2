@@ -952,3 +952,25 @@ bool Truncate(const string& path, size_t size, string* err) {
   }
   return true;
 }
+
+std::vector<std::string> SplitStrings(const std::string& str) {
+  std::vector<std::string> result;
+  std::string seps = " \t\r\n";
+  size_t lastPos = str.find_first_not_of(seps, 0);
+  size_t pos = str.find_first_of(seps, lastPos);
+  while (lastPos != std::string::npos) {
+    result.emplace_back(str.substr(lastPos, pos - lastPos));
+    lastPos = str.find_first_not_of(seps, pos);
+    pos = str.find_first_of(seps, lastPos);
+  }
+  return result;
+}
+
+std::string MergeStrings(const std::vector<std::string>& str_vector) {
+  std::string result;
+  for (auto& str : str_vector)
+    result.append(str).push_back(' ');
+  if (!result.empty())
+    result.pop_back();
+  return result;
+}

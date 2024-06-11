@@ -74,6 +74,7 @@ struct Subprocess {
   bool use_console_;
 
   friend struct SubprocessSet;
+  friend struct RemoteProcessSet;
 };
 
 /// SubprocessSet runs a ppoll/pselect() loop around a set of Subprocesses.

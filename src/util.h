@@ -128,4 +128,7 @@ std::string GetLastErrorString();
 NORETURN void Win32Fatal(const char* function, const char* hint = NULL);
 #endif
 
+std::vector<std::string> SplitStrings(const std::string& str);
+std::string MergeStrings(const std::vector<std::string>& str_vector);
+
 #endif  // NINJA_UTIL_H_

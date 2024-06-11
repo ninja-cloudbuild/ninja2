@@ -52,6 +52,10 @@
 #include "util.h"
 #include "version.h"
 
+#ifndef _WIN32
+#include "thread_pool.h"
+#endif
+
 using namespace std;
 
 #ifdef _WIN32
@@ -1447,9 +1451,18 @@ int ReadFlags(int* argc, char*** argv,
 
   int opt;
   while (!options->tool &&
-         (opt = getopt_long(*argc, *argv, "d:f:j:k:l:nt:vw:C:h", kLongOptions,
-                            NULL)) != -1) {
+         (opt = getopt_long(*argc, *argv, "c:r:d:f:j:k:l:nt:vw:C:h",
+                            kLongOptions, NULL)) != -1) {
     switch (opt) {
+      case 'c':
+        config->cloud_build = true;
+        config->grpc_url = optarg;
+        if (config->grpc_url.compare(0, 7, "grpc://") != 0)
+          Fatal("invalid grpc url");
+        break;
+      case 'r':
+        config->project_root = optarg;
+        break ;
       case 'd':
         if (!DebugEnable(optarg))
           return 1;
@@ -1553,7 +1566,20 @@ NORETURN void real_main(int argc, char** argv) {
     if (chdir(options.working_dir) < 0) {
       Fatal("chdir to '%s' - %s", options.working_dir, strerror(errno));
     }
+    config.cwd = options.working_dir;
+  } else if (config.cloud_build) {
+    string err;
+    if (!GetCurrentDirectory(&config.cwd, &err)) {
+      Error(err.c_str());
+      exit(1);
+    }
+    if (config.project_root.empty())
+      config.project_root = config.cwd;
   }
+
+  #ifndef _WIN32
+  SetThreadPoolThreadCount(GetProcessorCount());
+  #endif
 
   if (options.tool && options.tool->when == Tool::RUN_AFTER_FLAGS) {
     // None of the RUN_AFTER_FLAGS actually use a NinjaMain, but it's needed
