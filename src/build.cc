@@ -713,9 +713,7 @@ size_t CloudCommandRunner::CanRunMore() const{
 bool CloudCommandRunner::StartCommand(const EdgeWork& work) {
   if (!work.remote)
     return local_runner->StartCommand(work);
-  EdgeCommand c;
-  work.edge->EvaluateCommand(&c);
-  string command = c.command;
+  string command = work.edge->EvaluateCommand();
   auto spawn = RemoteExecutor::RemoteSpawn::CreateRemoteSpawn(work.edge);
   RemoteProcess* remoteproc = remote_procs_.Add(spawn);
   if (!remoteproc)
@@ -737,9 +735,6 @@ bool CloudCommandRunner::WaitForCommand(Result* result) {
   }
   if (subproc) {
     result->status = subproc->Finish();
-#ifndef _WIN32
-    result->rusage = *subproc->GetUsage();
-#endif
     result->output = subproc->GetOutput();
     auto e = local_runner->subproc_to_edge_.find(subproc);
     result->edge = e->second;
