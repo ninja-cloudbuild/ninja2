@@ -241,6 +241,15 @@ if options.bootstrap:
         os.mkdir('build')
     except OSError:
         pass
+    if not platform.is_windows():
+        try:
+            os.mkdir('build/protos')
+        except OSError:
+            pass
+        try:
+            os.mkdir('build/remote_executor')
+        except OSError:
+            pass
     # Wrap ninja_writer with the Bootstrapper, which also executes the
     # commands.
     print('bootstrapping ninja...')
@@ -375,7 +384,9 @@ else:
         # printf formats for int64_t, uint64_t; large file support
         cflags.append('-D__STDC_FORMAT_MACROS')
         cflags.append('-D_LARGE_FILES')
-
+    if not platform.is_windows():
+        cflags.append('-I' + built('protos'))
+        cflags.append('-DCLOUD_BUILD_SUPPORT')
 
 libs = []
 
@@ -425,6 +436,10 @@ n.variable('cflags', ' '.join(shell_escape(flag) for flag in cflags))
 if 'LDFLAGS' in configure_env:
     ldflags.append(configure_env['LDFLAGS'])
 n.variable('ldflags', ' '.join(shell_escape(flag) for flag in ldflags))
+if not platform.is_windows():
+    cpflags = cflags
+    cpflags.remove('-fno-rtti')  # protobuf uses rtti
+    n.variable('cpflags', ' '.join(shell_escape(flag) for flag in cpflags))
 n.newline()
 
 if platform.is_msvc():
@@ -436,6 +451,12 @@ if platform.is_msvc():
 else:
     n.rule('cxx',
         command='$cxx -MMD -MT $out -MF $out.d $cflags -c $in -o $out',
+        depfile='$out.d',
+        deps='gcc',
+        description='CXX $out')
+if not platform.is_windows():
+    n.rule('cpb',
+        command='$cxx -MMD -MT $out -MF $out.d $cpflags -c $in -o $out',
         depfile='$out.d',
         deps='gcc',
         description='CXX $out')
@@ -513,6 +534,94 @@ else:
     n.build(built('libninja-re2c.a'), 'ar', re2c_objs)
 n.newline()
 
+if not platform.is_windows():
+    n.comment('Generate C++ interface files from proto.')
+    def has_protoc():
+        try:
+            proc = subprocess.Popen(['protoc', '--version'],
+                                    stdout=subprocess.PIPE)
+            return proc.communicate()[0].startswith(b"libprotoc")
+        except OSError:
+            return False
+    if not has_protoc():
+        print("ERROR: protoc not found")
+        sys.exit(1)
+
+    def grpc_cpp_plugin():
+        try:
+            proc = subprocess.Popen(['which', 'grpc_cpp_plugin'],
+                                    stdout=subprocess.PIPE)
+            return bytes.decode(proc.communicate()[0])
+        except OSError:
+            return
+    grpc_cpp_plugin_path = grpc_cpp_plugin().rstrip()
+    if not grpc_cpp_plugin_path:
+        print("ERROR: grpc_cpp_plugin not found")
+        sys.exit(1)
+
+    proto_path = src('remote_executor/protos/')
+    cpp_out = built('protos/')
+    n.rule('protoc',
+        command='protoc --proto_path=' + proto_path +
+                ' --cpp_out=' + cpp_out + ' $in',
+        description='PROTOC $out')
+    n.rule('protoc_grpc',
+        command='protoc --proto_path=' + proto_path +
+                ' --grpc_out=' + cpp_out +
+                ' --plugin=protoc-gen-grpc=' + grpc_cpp_plugin_path + ' $in',
+        description='PROTOC_GRPC $out')
+
+    def protoc_src(name):
+        return src('remote_executor/protos/') + name + '.proto'
+    def protoc_dst(name, grpc=0):
+        if grpc:
+            return built('protos/') + name + '.grpc.pb.cc'
+        else:
+            return built('protos/') + name + '.pb.cc'
+    def protoc(name):
+        return n.build(protoc_dst(name), 'protoc', protoc_src(name))
+    def protoc_grpc(name):
+        return n.build(protoc_dst(name, 1), 'protoc_grpc', protoc_src(name))
+
+    proto_srcs = []
+    for name in ['build/bazel/remote/execution/v2/remote_execution',
+                 'build/bazel/semver/semver',
+                 'build/buildgrid/local_cas',
+                 'google/api/annotations',
+                 'google/api/http',
+                 'google/bytestream/bytestream',
+                 'google/longrunning/operations',
+                 'google/rpc/code',
+                 'google/rpc/error_details',
+                 'google/rpc/status']:
+        proto_srcs += protoc(name)
+
+    for name in ['build/bazel/remote/execution/v2/remote_execution',
+                 'build/buildgrid/local_cas',
+                 'google/bytestream/bytestream',
+                 'google/longrunning/operations',
+                 'google/rpc/error_details']:
+        proto_srcs += protoc_grpc(name)
+    def cxx_pb(name, **kwargs):
+        return n.build(name + '.o', 'cpb', name, **kwargs)
+    proto_objs = []
+    for name in proto_srcs:
+        proto_objs += cxx_pb(name, variables=cxxvariables)
+    n.newline()
+
+    n.comment('Remote executor files.')
+    re_objs = []
+    for name in ['cas_client',
+                 'compile_command_parser',
+                 'execution_context',
+                 'grpc_client',
+                 'remote_execution_client',
+                 'remote_spawn',
+                 'static_file_utils']:
+        re_objs += cxx_re('remote_executor/' + name, variables=cxxvariables)
+    re_objs += proto_objs
+    n.newline()
+
 n.comment('Core source files all build into ninja library.')
 objs.extend(re2c_objs)
 for name in ['build',
@@ -550,7 +659,11 @@ if platform.is_windows():
         objs += cxx('minidump-win32', variables=cxxvariables)
     objs += cc('getopt')
 else:
-    objs += cxx('subprocess-posix')
+    for name in ['subprocess-posix',
+                 'thread_pool']:
+        objs += cxx(name)
+    objs += cxx_re('remote_process')
+    objs += re_objs
 if platform.is_aix():
     objs += cc('getopt')
 if platform.is_msvc():
@@ -566,6 +679,13 @@ else:
 
 if platform.is_aix() and not platform.is_os400_pase():
     libs.append('-lperfstat')
+
+if not platform.is_windows():
+    libs.append('-lprotobuf')
+    libs.append('-lpthread')
+    libs.append('-lgrpc++')
+    libs.append('-lcrypto')
+    libs.append('-luuid')
 
 all_targets = []
 
