@@ -162,35 +162,44 @@ void Plan::EdgeWanted(const Edge* edge) {
 }
 
 EdgeWork Plan::FindWork(unsigned mode) {
-#ifdef CLOUD_BUILD_SUPPORT
-  if ((mode == 0 || ready_.empty()) && !local_ready_.empty()) { //local
-    auto e = local_ready_.top();
-    local_ready_.pop();
-    return { e, false };
-  }
-  if (ready_.empty())
-    return { nullptr, false };
-  Edge* edge = ready_.top();
-  ready_.pop();
-  if (mode == 0) //local
-    return { edge, false };
-  bool remote = RemoteExecutor::RemoteSpawn::CanExecuteRemotelly(edge);
-  if (mode > 1) //local or remote
-    return { edge, remote };
-  while (!remote && !ready_.empty()) { //remote needed
-    local_ready_.push(edge);
-    edge = ready_.top();
+  if(mode==0){
+    if(!local_ready_.empty()){
+      Edge* e=local_ready_.top();
+      local_ready_.pop();
+      return { e , false };
+    }
+    if(ready_.empty()){
+      return { nullptr,false};
+    }
+    Edge* e=ready_.top();
     ready_.pop();
-    remote = RemoteExecutor::RemoteSpawn::CanExecuteRemotelly(edge);
+    return {e,false};
   }
-  return { edge, remote };
-#else
-  if (ready_.empty())
-    return { nullptr, false };
-  Edge* edge = ready_.top();
-  ready_.pop();
-  return { edge, false};
-#endif
+  else if(mode==1){
+     while(!ready_.empty()){
+     Edge* e=ready_.top();
+     ready_.pop();
+     if(RemoteExecutor::RemoteSpawn::CanExecuteReotelly(e))
+     return {e,true};
+     else 
+        local_ready_.push(e);
+     }
+     return {nullptr,true};
+  }
+  else{
+    if(!local_ready_.empty()){
+      Edge* e=local_ready_.top();
+      local_ready_.pop();
+      return {e,false};
+    }
+    if(ready_.empty()){
+      return {nullptr,false};
+    }
+     Edge* e=ready_.top();
+     ready_.pop();
+     bool remote=RemoteExecutor::RemoteSpawn::CanExecuteReotelly(e);
+     return {e,remote};
+  }
 }
 
 void Plan::ScheduleWork(map<Edge*, Want>::iterator want_e) {
@@ -676,7 +685,7 @@ bool RealCommandRunner::WaitForCommand(Result* result) {
 }
 #ifdef CLOUD_BUILD_SUPPORT
 
-constexpr int proportion = 30; //Best result from benchmark
+constexpr int proportion = 3; //Best result from benchmark
 
 struct CloudCommandRunner : public CommandRunner {
   explicit CloudCommandRunner(const BuildConfig& config)
