@@ -169,6 +169,12 @@ private:
   int id_ = -1;
 };
 
+struct EdgeCommand {
+  std::string command;
+  bool use_console = false;
+  char** env = NULL;
+};
+
 /// An edge in the dependency graph; links between Nodes using Rules.
 struct Edge {
   enum VisitMark {

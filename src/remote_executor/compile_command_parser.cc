@@ -363,7 +363,7 @@ ExecResult ExecuteSubProcess(const std::vector<std::string>& command) {
   char szBuf[409600] = {0};
   FILE* pResultStr = popen(cmd.c_str(), "r");
   if (NULL == pResultStr) {
-    printf("popen faild. (%d, %s)\n",errno, strerror(errno));
+    printf("popen failed. (%d, %s)\n",errno, strerror(errno));
     return result;
   }
   auto len = fread(szBuf, 1, sizeof(szBuf), pResultStr);

@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+option go_package="../ninjaRegister";
+
+package ninjaRegister;
+
+// 定义request model
+message RegisterRequest {
+    string ninja_host = 1; //ninja所在机器的ip
+    string ninja_dir = 2; //ninja的工作目录
+    string root_dir = 3; //项目根目录
+}
+
+// 定义response model
+message RegisterResponse {
+    string success = 1; //返回成功信号
+}
+
+// 定义服务主体
+service RegisterService {
+    //gRPC函数 ninjaRegister
+    rpc ninjaRegister (RegisterRequest) returns (RegisterResponse) {}
+}

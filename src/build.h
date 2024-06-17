@@ -47,13 +47,13 @@ struct Plan {
   Plan(Builder* builder = NULL);
 
   /// Add a target to our plan (including all its dependencies).
-  /// Returns false if we don't need to build this target; may
+  /// Returns false if we don't need to build this target; mayz
   /// fill in |err| with an error message if there's a problem.
   bool AddTarget(const Node* target, std::string* err);
 
   // Pop a ready edge off the queue of edges to build.
   // Returns NULL if there's no work to do.
-  /// @param mode 0 local, 1 remote, other local/remote
+  /// @param mode 0 local or p2p share build, 1 cloud remote, other local/remote
   EdgeWork FindWork(unsigned mode = 0);
 
   /// Returns true if there's more work to be done.
@@ -156,7 +156,7 @@ private:
 struct CommandRunner {
   virtual ~CommandRunner() {}
   virtual size_t CanRunMore() const = 0;
-  virtual unsigned CommandMode() { return 0; }
+  virtual unsigned CommandMode() { return 0; } // non-cloud build.
   virtual bool StartCommand(const EdgeWork& work) = 0;
 
 
@@ -178,7 +178,7 @@ struct CommandRunner {
 /// Options (e.g. verbosity, parallelism) passed to a build.
 struct BuildConfig {
   BuildConfig() : verbosity(NORMAL), dry_run(false), parallelism(1), cloud_build(false),
-                  failures_allowed(1), max_load_average(-0.0f) {}
+                  share_build(false), failures_allowed(1), max_load_average(-0.0f) {}
 
   enum Verbosity {
     QUIET,  // No output -- used when testing.
@@ -188,10 +188,14 @@ struct BuildConfig {
   };
   Verbosity verbosity;
   bool dry_run;
-  bool cloud_build;
-  std::string grpc_url;
+
+  bool cloud_build;     // remote api cloud build
+  std::string grpc_url; // remote api master addr 
   std::string cwd;
   std::string project_root;
+  bool share_build; // p2p share build
+  std::string master_addr; // p2p master addr
+
   int parallelism;
   int failures_allowed;
   /// The maximum load average we must not exceed. A negative value

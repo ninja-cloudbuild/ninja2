@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.15)
 
+# set(CMAKE_PREFIX_PATH ./protos/lib/cmake)
+set(CMAKE_CXX_STANDARD 14)
 include(CheckSymbolExists)
 include(CheckIPOSupported)
 
@@ -7,6 +9,9 @@ option(NINJA_BUILD_BINARY "Build ninja binary" ON)
 option(NINJA_FORCE_PSELECT "Use pselect() even on platforms that provide ppoll()" OFF)
 
 project(ninja CXX)
+
+# # --- build Proto file
+# include(./cmake/common.cmake) # 编译proto文件，把这个include进来
 
 # --- optional link-time optimization
 check_ipo_supported(RESULT lto_supported OUTPUT error)
@@ -18,6 +23,7 @@ else()
 	message(STATUS "IPO / LTO not supported: <${error}>")
 endif()
 
+# add_definitions(-DUSE_PPOLL="false") # 不使用IO多路复用来回收任务了
 # --- compiler flags
 if(MSVC)
 	set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
@@ -122,6 +128,7 @@ if(NOT WIN32)
 	add_compile_definitions(USE_PPOLL)
 	add_compile_definitions(CLOUD_BUILD_SUPPORT)
 	add_subdirectory(src/remote_executor)
+	add_subdirectory(src/cloud)
 endif()
 
 
@@ -145,13 +152,28 @@ add_library(libninja OBJECT
 	src/manifest_parser.cc
 	src/metrics.cc
 	src/missing_deps.cc
+	src/thread_pool.cc
 	src/parser.cc
 	src/state.cc
 	src/status.cc
 	src/string_piece_util.cc
 	src/util.cc
 	src/version.cc
+
+
+	src/cloud/execute1Service.cc
+	src/cloud/ninjaRegisterService.cc
+	src/cloud/ninjaUnregisterService.cc
+	src/cloud/config.cc
+	src/cloud/share_thread.cc
 )
+
+find_package(yaml-cpp REQUIRED)#找到package
+
+# target_link_libraries(libninja yaml-cpp
+#     ${_REFLECTION}
+#     ${_GRPC_GRPCPP}
+#     ${_PROTOBUF_LIBPROTOBUF})
 if(WIN32)
 	target_sources(libninja PRIVATE
 		src/subprocess-win32.cc
@@ -188,8 +210,8 @@ endif()
 target_compile_features(libninja PUBLIC cxx_std_11)
 
 if(NOT WIN32)
-	target_link_libraries(libninja PUBLIC remote_executor)
-	add_dependencies(libninja remote_executor)
+	target_link_libraries(libninja PUBLIC remote_executor share_build_executor yaml-cpp)
+	add_dependencies(libninja remote_executor share_build_executor)
 endif()
 
 #Fixes GetActiveProcessorCount on MinGW
@@ -310,6 +332,10 @@ if(BUILD_TESTING)
   endif()
   find_package(Threads REQUIRED)
   target_link_libraries(ninja_test PRIVATE libninja libninja-re2c GTest::gtest Threads::Threads)
+  # share build   	
+  target_include_directories(ninja_test PUBLIC ${CMAKE_SOURCE_DIR}/src PUBLIC ${PROTO_GEN_DIR})
+  message(STATUS "PROTO_GEN_DIR: ${PROTO_GEN_DIR}")
+
 
   foreach(perftest
     build_log_perftest

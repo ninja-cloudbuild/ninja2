@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+option go_package="../ninjaUnregister";
+
+package ninjaUnregister;
+
+// 定义request model
+message UnregisterRequest {
+  string ninja_host = 1; //ninja所在机器的ip
+  string ninja_dir = 2; //ninja的工作目录
+  string root_dir = 3; //项目根目录
+}
+
+// 定义response model
+message UnregisterResponse {
+  string success = 1; //返回成功信号
+}
+
+// 定义服务主体
+service UnregisterService {
+  //gRPC函数 ninjaRegister
+  rpc ninjaUnregister (UnregisterRequest) returns (UnregisterResponse) {}
+}

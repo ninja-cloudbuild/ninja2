@@ -20,6 +20,15 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <net/if.h>
+#include <arpa/inet.h>
+#include <ifaddrs.h>
+#include <cstdlib>
+#include <fstream>
+
 
 #ifdef _WIN32
 #include "getopt.h"
@@ -56,7 +65,21 @@
 #include "thread_pool.h"
 #endif
 
+#include <deque>
+#include <unordered_map>
+#include <unordered_set>
+#include "thread_pool.h"
+#include "cloud/ninjaRegisterService.h"
+#include "cloud/ninjaUnregisterService.h"
+#include "cloud/config.h"
+
 using namespace std;
+using ninjaRegister::RegisterRequest;
+using ninjaRegister::RegisterResponse;
+using ninjaRegister::RegisterService;
+using ninjaUnregister::UnregisterRequest;
+using ninjaUnregister::UnregisterResponse;
+using ninjaUnregister::UnregisterService;
 
 #ifdef _WIN32
 // Defined in msvc_helper_main-win32.cc.
@@ -1451,9 +1474,14 @@ int ReadFlags(int* argc, char*** argv,
 
   int opt;
   while (!options->tool &&
-         (opt = getopt_long(*argc, *argv, "c:r:d:f:j:k:l:nt:vw:C:h",
+         (opt = getopt_long(*argc, *argv, "p:c:r:d:f:j:k:l:nt:vw:C:h",
                             kLongOptions, NULL)) != -1) {
     switch (opt) {
+      case 'p':
+        config->share_build = true;
+        config->master_addr = optarg;
+        sharebuild_config.masterAddr = optarg;
+        break;
       case 'c':
         config->cloud_build = true;
         config->grpc_url = optarg;
@@ -1462,7 +1490,8 @@ int ReadFlags(int* argc, char*** argv,
         break;
       case 'r':
         config->project_root = optarg;
-        break ;
+        sharebuild_config.rootDir = optarg;
+        break;
       case 'd':
         if (!DebugEnable(optarg))
           return 1;
@@ -1539,6 +1568,20 @@ int ReadFlags(int* argc, char*** argv,
   return -1;
 }
 
+bool reg(const std::string& ninja_host, const std::string& ninja_dir, const std::string& scheduler_addr, const std::string& root_dir) {
+    RegisterClient registerClient(grpc::CreateChannel(scheduler_addr, grpc::InsecureChannelCredentials()));
+    bool registerSuccess = registerClient.Register(ninja_host, ninja_dir, root_dir);
+    cout << "注册结果 registerSuccess is " << registerSuccess  << endl;
+    return registerSuccess;
+}
+
+bool unReg(const std::string& ninja_host, const std::string& ninja_dir, const std::string& scheduler_addr, const std::string& root_dir) {
+  UnregisterClient unregisterClient(grpc::CreateChannel(scheduler_addr, grpc::InsecureChannelCredentials()));
+  bool unregisterSuccess = unregisterClient.Unregister(ninja_host, ninja_dir, root_dir);
+  cout << "注册结果 unregisterSuccess is " << unregisterSuccess  << endl;
+  return unregisterSuccess;
+}
+
 NORETURN void real_main(int argc, char** argv) {
   // Use exit() instead of return in this function to avoid potentially
   // expensive cleanup when destructing NinjaMain.
@@ -1567,7 +1610,7 @@ NORETURN void real_main(int argc, char** argv) {
       Fatal("chdir to '%s' - %s", options.working_dir, strerror(errno));
     }
     config.cwd = options.working_dir;
-  } else if (config.cloud_build) {
+  } else if (config.cloud_build || config.share_build) {
     string err;
     if (!GetCurrentDirectory(&config.cwd, &err)) {
       Error(err.c_str());
@@ -1576,6 +1619,25 @@ NORETURN void real_main(int argc, char** argv) {
     if (config.project_root.empty())
       config.project_root = config.cwd;
   }
+
+  if (config.share_build) {
+    cout << "启动 p2p share 分布式编译模式" << endl;
+    // 注册ninja
+    bool registerSuccess = reg(sharebuild_config.ipv4_address, sharebuild_config.ninjaDir, sharebuild_config.masterAddr, sharebuild_config.rootDir);
+    if(!registerSuccess) {
+      //注册失败
+      cout << "注册失败" << endl;
+      config.share_build = false; //shut down share build
+    }
+    cout << "sleep(3)" << endl;
+    sleep(3);
+  } else if (config.cloud_build) {
+    cout << "启动 remote api 分布式编译模式" << endl;
+  } else {
+    cout << "启动本地编译模式" << endl;
+  }
+ 
+
 
   #ifndef _WIN32
   SetThreadPoolThreadCount(GetProcessorCount());
@@ -1634,6 +1696,18 @@ NORETURN void real_main(int argc, char** argv) {
     int result = ninja.RunBuild(argc, argv, status);
     if (g_metrics)
       ninja.DumpMetrics();
+
+    if (config.share_build) {
+			std::cout << "注销" << std::endl;
+			// 注销ninja
+			bool unregisterSuccess = unReg(sharebuild_config.ipv4_address, sharebuild_config.ninjaDir, sharebuild_config.masterAddr, sharebuild_config.rootDir);
+
+			if (!unregisterSuccess) {
+				//注销失败
+				cout << "注销失败" << endl;
+				exit(-1);
+			}
+    }
     exit(result);
   }
 
