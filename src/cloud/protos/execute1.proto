@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+option go_package="../execute1";
+
+package execute1;
+
+// 定义request model
+message ExecuteRequest {
+  string id = 1; //任务id
+  string ninja_host = 2;
+  string content = 3; //cmd命令的内容
+  bool onlyLocal = 4; //指定必须发给本地executor执行（即与ninja的ip地址相同的那个executor）
+  string ninja_dir = 5; //任务执行目录
+}
+
+// 定义response model
+message ExecuteResult {
+  string success = 1; //返回成功信号
+  string id = 2; //任务id
+  string executor_ip = 3; //任务是在哪个executor执行完成的
+  int32 nFail = 4; //失败了几次（NFS可能导致文件系统忙，有时候需要重试）
+
+  //命令执行的结果，包括标准输出和标准错误
+  string std_out = 5;
+  string std_err = 6;
+}
+
+// 定义服务主体
+service ExecuteService {
+  //Execute函数：发送任务，返回执行结果
+  rpc Execute (ExecuteRequest) returns (ExecuteResult) {}
+}

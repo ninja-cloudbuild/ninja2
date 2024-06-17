@@ -130,7 +130,7 @@ void StaticFileUtils::CreateDirectoriesInPath(int dirfd,
   const auto mkdir_status = mkdirat(dirfd, path.c_str(), mode);
   const auto mkdir_error = errno;
   if (mkdir_status == 0 || mkdir_error == EEXIST) {
-    return; // Directory was succesfully created or already exists, done.
+    return; // Directory was successfully created or already exists, done.
   }
   if (mkdir_error != ENOENT) { // Something went wrong, aborting.
     Fatal("Could not create directory [%s]: %s", path.c_str(),

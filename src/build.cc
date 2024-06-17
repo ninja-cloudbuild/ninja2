@@ -24,6 +24,17 @@
 #include <functional>
 #include <unordered_set>
 
+#include <set>
+#include <sstream>
+#include <stdio.h>
+#include <stdlib.h>
+#include <vector>
+
+#ifdef _WIN32
+#include <fcntl.h>
+#include <io.h>
+#endif
+
 #if defined(__SVR4) && defined(__sun)
 #include <sys/termios.h>
 #endif
@@ -46,6 +57,10 @@
 #endif
 
 using namespace std;
+#include "cloud/config.h"
+#include "cloud/share_thread.h"
+
+#include <grpcpp/grpcpp.h>
 
 namespace {
 
@@ -164,45 +179,53 @@ void Plan::EdgeWanted(const Edge* edge) {
 }
 
 EdgeWork Plan::FindWork(unsigned mode) {
-  if(mode==0){
-    if(!local_ready_.empty()){
-      Edge* e=local_ready_.top();
+  if (mode==0) { // only local && p2p share build.
+    if (!local_ready_.empty()) { // find first in local_ready
+      Edge* e = local_ready_.top();
       local_ready_.pop();
-      return { e , false };
+      return {e, false};
     }
-    if(ready_.empty()){
-      return { nullptr,false};
+    if (ready_.empty()) {  // then find in ready
+      return {nullptr, false};
     }
-    Edge* e=ready_.top();
+
+    Edge* e = ready_.top();
     ready_.pop();
-    return {e,false};
-  }
-  else if(mode==1){
-     while(!ready_.empty()){
-     Edge* e=ready_.top();
-     ready_.pop();
-     if(RemoteExecutor::RemoteSpawn::CanExecuteRemotelly(e))
-     return {e,true};
-     else 
+    return {e, false};
+  } else if (mode == 1) { // only remote
+    while (!ready_.empty()) { // find first remote edge in ready
+      Edge* e = ready_.top();
+      ready_.pop();
+      if (RemoteExecutor::RemoteSpawn::CanExecuteRemotelly(e))
+        return {e, true};
+      else 
         local_ready_.push(e);
-     }
-     return {nullptr,true};
-  }
-  else{
-    if(!local_ready_.empty()){
-      Edge* e=local_ready_.top();
-      local_ready_.pop();
-      return {e,false};
     }
-    if(ready_.empty()){
+    return {nullptr, true}; // none can remote, true takes no effect
+  } else { // local or remote
+    if (!local_ready_.empty()) { // check local_ready first
+      Edge* e = local_ready_.top();
+      local_ready_.pop();
+      return {e, false};
+    }
+    if (ready_.empty()) {
       return {nullptr,false};
     }
-     Edge* e=ready_.top();
-     ready_.pop();
-     bool remote=RemoteExecutor::RemoteSpawn::CanExecuteRemotelly(e);
-     return {e,remote};
+    Edge* e = ready_.top(); // just find next ready
+    ready_.pop();
+    bool remote=RemoteExecutor::RemoteSpawn::CanExecuteRemotelly(e);
+    return {e, remote};
   }
 }
+
+// Edge* Plan::FindWork() {
+//   if (ready_.empty())
+//     return NULL;
+
+//   Edge* work = ready_.top();
+//   ready_.pop();
+//   return work;
+// }
 
 void Plan::ScheduleWork(map<Edge*, Want>::iterator want_e) {
   if (want_e->second == kWantToFinish) {
@@ -311,9 +334,12 @@ bool Plan::CleanNode(DependencyScan* scan, Node* node, string* err) {
     vector<Node*>::iterator
         begin = (*oe)->inputs_.begin(),
         end = (*oe)->inputs_.end() - (*oe)->order_only_deps_;
-
-
-    if (find_if(begin, end, mem_fn(&Node::dirty)) == end) {
+#if __cplusplus < 201703L
+#define MEM_FN mem_fun
+#else
+#define MEM_FN mem_fn  // mem_fun was removed in C++17.
+#endif
+    if (find_if(begin, end, MEM_FN(&Node::dirty)) == end) {
       // Recompute most_recent_input.
       Node* most_recent_input = NULL;
       for (vector<Node*>::iterator i = begin; i != end; ++i) {
@@ -627,6 +653,88 @@ void Plan::Dump() const {
   printf("ready: %d\n", (int)ready_.size());
 }
 
+struct ShareCommandRunner : public CommandRunner {
+  explicit ShareCommandRunner(const BuildConfig& config) : config_(config) {}
+  virtual ~ShareCommandRunner() {}
+  virtual size_t CanRunMore() const;
+  virtual bool StartCommand(const EdgeWork& work);
+  virtual bool WaitForCommand(Result* result);
+  virtual vector<Edge*> GetActiveEdges();
+  virtual void Abort();
+
+  const BuildConfig& config_;
+  ShareThreadSet share_threads_;
+  map<ShareThread*, Edge*> thread_to_edge_;
+};
+
+vector<Edge*> ShareCommandRunner::GetActiveEdges() {
+  vector<Edge*> edges;
+  for (map<ShareThread*, Edge*>::iterator e = thread_to_edge_.begin();
+       e != thread_to_edge_.end(); ++e)
+    edges.push_back(e->second);
+  return edges;
+}
+
+void ShareCommandRunner::Abort() {
+  share_threads_.Clear();
+}
+
+size_t ShareCommandRunner::CanRunMore() const {
+  size_t subproc_number =
+      share_threads_.running_.size() + share_threads_.finished_.size();
+
+  int64_t capacity = config_.parallelism - subproc_number;
+
+  if (config_.max_load_average > 0.0f) {
+    int load_capacity = config_.max_load_average - GetLoadAverage();
+    if (load_capacity < capacity)
+      capacity = load_capacity;
+  }
+
+  if (capacity < 0)
+    capacity = 0;
+
+  if (capacity == 0 && share_threads_.running_.empty())
+    // Ensure that we make progress.
+    capacity = 1;
+
+  return capacity;
+}
+
+bool ShareCommandRunner::StartCommand(const EdgeWork& work) {
+  EdgeCommand c;
+  work.edge->EvaluateCommand(&c);
+  ShareThread* share_thread = share_threads_.Add(c);
+  if (!share_thread)
+    return false;
+  thread_to_edge_.insert(make_pair(share_thread, work.edge));
+
+  return true;
+}
+
+bool ShareCommandRunner::WaitForCommand(Result* result) {
+  ShareThread* share_thread;
+  while ((share_thread = share_threads_.NextFinished()) == NULL) { //从finish_队列出队一个元素
+    bool interrupted = share_threads_.DoWork(); // 将执行完成的share_thread从running_队列移到finish_队列
+    if (interrupted)
+      return false;
+  }
+
+  result->status = share_thread->Finish();
+// #ifndef _WIN32
+//   result->rusage = *share_thread->GetUsage();
+// #endif
+  result->output = share_thread->GetOutput(); //拿到 share_thread 的 result_output
+
+  map<ShareThread*, Edge*>::iterator e = thread_to_edge_.find(share_thread);
+  result->edge = e->second;
+  thread_to_edge_.erase(e);
+
+  delete share_thread;
+  return true;
+}
+
+
 struct RealCommandRunner : public CommandRunner {
   explicit RealCommandRunner(const BuildConfig& config) : config_(config) {}
   virtual ~RealCommandRunner() {}
@@ -730,13 +838,12 @@ struct CloudCommandRunner : public CommandRunner {
   map<const RemoteProcess*, Edge*> remoteproc_to_edge;
 };
 
-size_t CloudCommandRunner::CanRunMore() const{
-  busyStatus = local_runner->CanRunMore()>0 ? 0 : LOCAL_BUSY;
+size_t CloudCommandRunner::CanRunMore() const {
+  local_runner->CanRunMore();
+  busyStatus = local_runner->CanRunMore() > 0 ? 0 : LOCAL_BUSY;
   if (remote_procs_.ThreadPoolAlreadyFull())
     busyStatus |= REMOTE_BUSY;
-    if(busyStatus != ALL_BUSY)
-    return 1;
-    return 0;
+  return busyStatus != ALL_BUSY;
 }
 
 bool CloudCommandRunner::StartCommand(const EdgeWork& work) {
@@ -904,8 +1011,11 @@ bool Builder::Build(string* err) {
       command_runner_.reset(new CloudCommandRunner(config_));
     }
 #endif
-    else
-      command_runner_.reset(new RealCommandRunner(config_));
+    else if (config_.share_build) {
+        command_runner_.reset(new ShareCommandRunner(config_));
+    } else {
+        command_runner_.reset(new RealCommandRunner(config_));
+    }
   }
 
   // We are about to start the build process.
@@ -919,73 +1029,74 @@ bool Builder::Build(string* err) {
   while (plan_.more_to_do()) {
     // See if we can start any more commands.
     if (failures_allowed) {
-      if(config_.cloud_build && command_runner_->CanRunMore() > 0){
-       auto work = plan_.FindWork(command_runner_->CommandMode());
-      if (Edge* edge = work.edge) {
-        if (edge->GetBindingBool("generator")) {
-          scan_.build_log()->Close();
-        }
+      if (config_.cloud_build) {
+        if (command_runner_->CanRunMore() > 0) {
+          auto work = plan_.FindWork(command_runner_->CommandMode());
+          if (Edge* edge = work.edge) {
+            if (edge->GetBindingBool("generator")) {
+              scan_.build_log()->Close();
+            }
 
-        if (!StartEdge(work, err)) {
-          Cleanup();
-          status_->BuildFinished();
-          return false;
-        }
+            if (!StartEdge(work, err)) {
+              Cleanup();
+              status_->BuildFinished();
+              return false;
+            }
 
-        if (edge->is_phony()) {
-          if (!plan_.EdgeFinished(edge, Plan::kEdgeSucceeded, err)) {
+            if (edge->is_phony()) {
+              if (!plan_.EdgeFinished(edge, Plan::kEdgeSucceeded, err)) {
+                Cleanup();
+                status_->BuildFinished();
+                return false;
+              }
+            } else {
+              ++pending_commands;
+            }
+
+            // We made some progress; go back to the main loop.
+            continue;
+          }
+        }
+        
+      } else { // share build(p2p) or local build.
+        size_t capacity = command_runner_->CanRunMore();
+        while (capacity > 0) {
+          auto work = plan_.FindWork(command_runner_->CommandMode());
+          Edge* edge=work.edge;
+          if (!edge)
+            break;
+
+          if (edge->GetBindingBool("generator")) {
+            scan_.build_log()->Close();
+          }
+
+          if (!StartEdge(work, err)) {
             Cleanup();
             status_->BuildFinished();
             return false;
           }
-        } else {
-          ++pending_commands;
-        }
 
-        // We made some progress; go back to the main loop.
-        continue;
-      }
-      }
-      else{
-      size_t capacity = command_runner_->CanRunMore();
-      while (capacity > 0) {
-        auto work = plan_.FindWork(command_runner_->CommandMode());
-        Edge* edge=work.edge;
-        if (!edge)
-          break;
+          if (edge->is_phony()) {
+            if (!plan_.EdgeFinished(edge, Plan::kEdgeSucceeded, err)) {
+              Cleanup();
+              status_->BuildFinished();
+              return false;
+            }
+          } else {
+            ++pending_commands;
 
-        if (edge->GetBindingBool("generator")) {
-          scan_.build_log()->Close();
-        }
+            --capacity;
 
-        if (!StartEdge(work, err)) {
-          Cleanup();
-          status_->BuildFinished();
-          return false;
-        }
-
-        if (edge->is_phony()) {
-          if (!plan_.EdgeFinished(edge, Plan::kEdgeSucceeded, err)) {
-            Cleanup();
-            status_->BuildFinished();
-            return false;
+            // Re-evaluate capacity.
+            size_t current_capacity = command_runner_->CanRunMore();
+            if (current_capacity < capacity)
+              capacity = current_capacity;
           }
-        } else {
-          ++pending_commands;
-
-          --capacity;
-
-          // Re-evaluate capacity.
-          size_t current_capacity = command_runner_->CanRunMore();
-          if (current_capacity < capacity)
-            capacity = current_capacity;
         }
-      }
-      
 
-       // We are finished with all work items and have no pending
-       // commands. Therefore, break out of the main loop.
-       if (pending_commands == 0 && !plan_.more_to_do()) break;
+        // We are finished with all work items and have no pending
+        // commands. Therefore, break out of the main loop.
+        if (pending_commands == 0 && !plan_.more_to_do()) break;
       }
     }
 
