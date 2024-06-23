@@ -85,3 +85,29 @@ ninja doxygen
 ```
 
 Then open `doc/doxygen/html/index.html` in a browser to look at it.
+
+
+
+# Ninja2
+
+## QuickStart
+
+### Local build & install
+
+1. build: `./build.sh build`
+
+2. install: `./build.sh install`
+
+3. clean: `./build.sh clean` or `rm -rf ./build`
+
+### Docker
+
+1. From the project directory, build the Docker image using the provided Dockerfile: 
+
+   `docker build -t ninja2-cloud . `.
+
+2. Run container:
+
+   `docker run -rm -it ninja2-cloud`.
+
+    --rm flag cleans up the container after it exits, and -it allows interaction with the container.
