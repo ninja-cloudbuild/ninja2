@@ -69,9 +69,9 @@
 #include <unordered_map>
 #include <unordered_set>
 #include "thread_pool.h"
-#include "cloud/ninjaRegisterService.h"
-#include "cloud/ninjaUnregisterService.h"
-#include "cloud/config.h"
+#include "share_build/ninjaRegisterService.h"
+#include "share_build/ninjaUnregisterService.h"
+#include "share_build/config.h"
 
 using namespace std;
 using ninjaRegister::RegisterRequest;
@@ -250,6 +250,12 @@ void Usage(const BuildConfig& config) {
 "  --version      print ninja version (\"%s\")\n"
 "  -v, --verbose  show all command lines while building\n"
 "  --quiet        don't show progress status, just command output\n"
+"\n"
+"  remote options: Make sure a remote compilation server is running at the\n"
+"                  specified `server_addr` before using these options.\n"
+"  -c server_addr        remote cloud build mode (remote execution api)\n"
+"  -s server_addr        remote share build mode (p2p)\n"
+"  -r project_root_dir   only valid in remote build mode\n"
 "\n"
 "  -C DIR   change to DIR before doing anything else\n"
 "  -f FILE  specify input build file [default=build.ninja]\n"
@@ -1474,7 +1480,7 @@ int ReadFlags(int* argc, char*** argv,
 
   int opt;
   while (!options->tool &&
-         (opt = getopt_long(*argc, *argv, "p:c:r:d:f:j:k:l:nt:vw:C:h",
+         (opt = getopt_long(*argc, *argv, "s:c:r:d:f:j:k:l:nt:vw:C:h",
                             kLongOptions, NULL)) != -1) {
     switch (opt) {
       case 'p':
