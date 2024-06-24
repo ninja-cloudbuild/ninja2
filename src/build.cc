@@ -57,8 +57,8 @@
 #endif
 
 using namespace std;
-#include "cloud/config.h"
-#include "cloud/share_thread.h"
+#include "share_build/config.h"
+#include "share_build/share_thread.h"
 
 #include <grpcpp/grpcpp.h>
 

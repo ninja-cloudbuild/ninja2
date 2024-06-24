@@ -128,7 +128,7 @@ if(NOT WIN32)
 	add_compile_definitions(USE_PPOLL)
 	add_compile_definitions(CLOUD_BUILD_SUPPORT)
 	add_subdirectory(src/remote_executor)
-	add_subdirectory(src/cloud)
+	add_subdirectory(src/share_build)
 endif()
 
 
@@ -161,11 +161,11 @@ add_library(libninja OBJECT
 	src/version.cc
 
 
-	src/cloud/execute1Service.cc
-	src/cloud/ninjaRegisterService.cc
-	src/cloud/ninjaUnregisterService.cc
-	src/cloud/config.cc
-	src/cloud/share_thread.cc
+	src/share_build/execute1Service.cc
+	src/share_build/ninjaRegisterService.cc
+	src/share_build/ninjaUnregisterService.cc
+	src/share_build/config.cc
+	src/share_build/share_thread.cc
 )
 
 find_package(yaml-cpp REQUIRED)#找到package
