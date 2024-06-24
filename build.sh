@@ -64,8 +64,8 @@ function install {
     exit 1
   fi
   
-  local install_path="/usr/local/bin/ninja"
-  local backup_path="/usr/local/bin/ninja.prev"
+  local install_path="/usr/bin/ninja"
+  local backup_path="/usr/bin/ninja.prev"
 
   # Backup existing ninja if it exists
   if [ -f "$install_path" ]; then
