@@ -703,7 +703,7 @@ size_t ShareCommandRunner::CanRunMore() const {
 
 bool ShareCommandRunner::StartCommand(const EdgeWork& work) {
   EdgeCommand c;
-  work.edge->EvaluateCommand(&c);
+  c.command = work.edge->EvaluateCommand();
   ShareThread* share_thread = share_threads_.Add(c);
   if (!share_thread)
     return false;
