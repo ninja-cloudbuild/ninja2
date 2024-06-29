@@ -111,3 +111,10 @@ Then open `doc/doxygen/html/index.html` in a browser to look at it.
    `docker run -rm -it ninja2-cloud`.
 
     --rm flag cleans up the container after it exits, and -it allows interaction with the container.
+
+### vscode-devcontainer
+
+1. environment prepare: https://code.visualstudio.com/docs/devcontainers/containers
+
+2. developing inside a Container: Press F1 in VS Code and execute the command "DevContainers: Reopen in Container".
+
