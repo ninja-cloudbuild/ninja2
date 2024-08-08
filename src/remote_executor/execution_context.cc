@@ -154,7 +154,7 @@ void BuildMerkleTree(const std::set<std::string>& deps, const std::string& cwd,
     merklePath = StaticFileUtils::NormalizePath(merklePath.c_str());
     if (merklePath[0] == '/' &&
         !StaticFileUtils::HasPathPrefix(merklePath,
-                                        RemoteSpawn::config->project_root)) {
+                                        RemoteSpawn::config->rbe_config_ptr->project_root)) {
       continue;
     }
     File file(dep.c_str());
@@ -181,7 +181,8 @@ std::string CommonAncestorPath(const std::set<std::string> &deps,
 build::bazel::remote::execution::v2::Command GenerateCommandProto(
     const std::vector<std::string>& command,
     const std::set<std::string>& outputs,
-    const std::string& work_dir) {
+    const std::string& work_dir,
+    const std::map<std::string, std::string> rbe_properties) {
   Command cmd_proto;
   for (const auto& arg : command)
     cmd_proto.add_arguments(arg);
@@ -196,6 +197,13 @@ build::bazel::remote::execution::v2::Command GenerateCommandProto(
     }
   }
   cmd_proto.set_working_directory(work_dir);
+  
+  Platform* platform = cmd_proto.mutable_platform();
+  for (const auto& prop_kv : rbe_properties) {
+    auto* new_property = platform->add_properties();
+    new_property->set_name(prop_kv.first);
+    new_property->set_value(prop_kv.second);
+  }
   return cmd_proto;
 }
 
@@ -217,7 +225,7 @@ Action BuildAction(RemoteSpawn* spawn, const std::string& cwd,
   }
   const auto dir_digest = nested_dir.ToDigest(blobs);
   const auto cmd_proto = GenerateCommandProto(spawn->arguments, products,
-                                                 cmd_work_dir);
+                                                 cmd_work_dir, spawn->config->rbe_config_ptr->rbe_properties);
   const auto cmd_digest = MakeDigest(cmd_proto);
   (*blobs)[cmd_digest] = cmd_proto.SerializeAsString();
 
@@ -252,7 +260,7 @@ std::string ToolInvocationID() {
 ConnectionOptions GetConnectOptions() {
   // For now, Server & CAS_Server & ActionCache_Server use the same
   ConnectionOptions option;
-  option.SetUrl(RemoteExecutor::RemoteSpawn::config->grpc_url);
+  option.SetUrl(RemoteExecutor::RemoteSpawn::config->rbe_config_ptr->grpc_url);
   option.SetInstanceName("");
   option.SetRetryLimit(0);
   option.SetRetryDelay(100);
@@ -262,7 +270,7 @@ ConnectionOptions GetConnectOptions() {
 
 void ExecutionContext::Execute(int fd, RemoteExecutor::RemoteSpawn* spawn,
                               int& exit_code) {
-  const std::string cwd = spawn->config->cwd;
+  const std::string cwd = spawn->config->rbe_config_ptr->cwd;
   DigestStringMap blobs, digest_files;
   std::set<std::string> products;
   const auto action = BuildAction(spawn, cwd, &blobs, &digest_files, products);
@@ -307,7 +315,7 @@ void ExecutionContext::Execute(int fd, RemoteExecutor::RemoteSpawn* spawn,
   // Allows download of stdout, stderr and output files in a single batch.
   const std::string stdout_fn = ".remote_execute_stdout_" + postfix;
   const std::string stderr_fn = ".remote_execute_stderr_" + postfix;
-  const std::string prefix = spawn->config->cwd + "/.remote_stdout_stderr/";
+  const std::string prefix = spawn->config->rbe_config_ptr->cwd + "/.remote_stdout_stderr/";
   if (result.has_stdout_digest()) {
     OutputFile output;
     output.mutable_digest()->CopyFrom(result.stdout_digest());
@@ -321,7 +329,7 @@ void ExecutionContext::Execute(int fd, RemoteExecutor::RemoteSpawn* spawn,
     *result.add_output_files() = output;
   }
 
-  auto root = spawn->config->cwd.c_str();
+  auto root = spawn->config->rbe_config_ptr->cwd.c_str();
   FileDescriptor root_dirfd(open(root, O_RDONLY | O_DIRECTORY));
   if (root_dirfd.Get() < 0)
     Fatal("Error opening directory at path \"%s\".", root);

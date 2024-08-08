@@ -79,7 +79,7 @@ OptType OptionType(const std::string& option) {
   if (option.empty())
     return OptType::errPath;
   if (option[0] == '/') {
-    const auto& prj_root = RemoteSpawn::config->project_root;
+    const auto& prj_root = RemoteSpawn::config->rbe_config_ptr->project_root;
     return StaticFileUtils::HasPathPrefix(option, prj_root)
         ? OptType::absPath : OptType::toolPath;
   }
@@ -97,19 +97,19 @@ OptType OptionType(const std::string& option) {
 void RemoteSpawn::ConvertAllPathToRelative() {
   for (auto& input : inputs) {
     if (OptionType(input) == OptType::absPath)
-      input = StaticFileUtils::MakePathRelative(input, config->cwd);
+      input = StaticFileUtils::MakePathRelative(input, config->rbe_config_ptr->cwd);
   }
   for (auto& output : outputs) {
     if (OptionType(output) == OptType::absPath)
-      output = StaticFileUtils::MakePathRelative(output, config->cwd);
+      output = StaticFileUtils::MakePathRelative(output, config->rbe_config_ptr->cwd);
   }
   for (auto& arg : arguments) {
     auto opt = OptionType(arg);
     if (opt == OptType::absPath)
-      arg = StaticFileUtils::MakePathRelative(arg, config->cwd);
+      arg = StaticFileUtils::MakePathRelative(arg, config->rbe_config_ptr->cwd);
     else if (opt == OptType::option)
       arg = arg.substr(0,2) +
-            StaticFileUtils::MakePathRelative(arg.substr(2), config->cwd);
+            StaticFileUtils::MakePathRelative(arg.substr(2), config->rbe_config_ptr->cwd);
   }
   command = MergeStrings(arguments);
 }

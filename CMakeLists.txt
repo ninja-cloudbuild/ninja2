@@ -152,6 +152,7 @@ add_library(libninja OBJECT
 	src/manifest_parser.cc
 	src/metrics.cc
 	src/missing_deps.cc
+	src/rbe_config.cc
 	src/thread_pool.cc
 	src/parser.cc
 	src/state.cc
@@ -164,7 +165,6 @@ add_library(libninja OBJECT
 	src/share_build/execute1Service.cc
 	src/share_build/ninjaRegisterService.cc
 	src/share_build/ninjaUnregisterService.cc
-	src/share_build/config.cc
 	src/share_build/share_thread.cc
 )
 
