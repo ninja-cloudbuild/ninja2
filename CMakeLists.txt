@@ -225,6 +225,18 @@ if(CMAKE_SYSTEM_NAME STREQUAL "OS400" OR CMAKE_SYSTEM_NAME STREQUAL "AIX")
 	add_compile_definitions(__STDC_FORMAT_MACROS)
 endif()
 
+include(FetchContent)
+FetchContent_Declare(jsoncpp URL https://github.com/open-source-parsers/jsoncpp/archive/refs/tags/1.9.5.tar.gz)
+FetchContent_GetProperties(jsoncpp)
+if (NOT jsoncpp_POPULATED)
+    FetchContent_Populate(jsoncpp)
+    add_subdirectory(${jsoncpp_SOURCE_DIR} ${jsoncpp_BINARY_DIR})
+    message(${jsoncpp_SOURCE_DIR})
+    message(${jsoncpp_BINARY_DIR})
+endif ()
+target_link_libraries(libninja PRIVATE jsoncpp_static)
+
+
 # Main executable is library plus main() function.
 if(NINJA_BUILD_BINARY)
 	add_executable(ninja src/ninja.cc)

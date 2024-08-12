@@ -13,14 +13,35 @@
 #include <fstream>
 #include "rbe_config.h"
 
+#include <json/json.h>
+
 RBEConfig g_rbe_config;
 
 
 RBEConfig::RBEConfig() {
-    // 可以在构造函数中直接调用读取配置的方法，或者在程序其他部分调用以初始化配置
-    if (!load_config_with_yaml("/home/chanfun/merge_work/ninja2/config.yaml")) {
-        std::cerr << "Failed to read configuration." << std::endl;
+    // Users can adjust the overall options/parameters of RBE in the config.yaml file
+    // TODO: support users in specifying a configuration file via command-line argument
+    std::string ninja2_project_dir = "/home/chanfun/merge_work/ninja2";
+    std::string config_path = ninja2_project_dir + "/config.yaml";
+    if (!load_config_with_yaml(config_path)) {
+        std::cout << "Waning: Failed to read RBE configuration." << std::endl;
     }
+
+    // By reading the .devcontainer/devcontainer.json file, obtain the image address that allows the project to be successfully built.                                     
+    // When remote compilation is enabled, the build node will pull up a container using this image address to perform the build task. 
+    try {
+        std::string devcontainer_path = ninja2_project_dir + "/.devcontainer/devcontainer.json";
+        std::ifstream f(devcontainer_path);
+        Json::Value root;
+        f >> root;
+
+        std::string docker_prefix = "docker://";
+        rbe_properties["container-image"] = docker_prefix + root.get("image", "docker.io/chanfun/ninja2_ubuntu:1.0").asString();
+        rbe_properties["workload-isolation-type"] = "docker";
+    } catch (const std::exception& e) {
+        std::cout << "Waning: fail to parse image key-value from devcontainer.json: " << e.what() << std::endl;
+    }
+
 }
 
 std::ostream& operator<<(std::ostream& os, const RBEConfig& config) {
@@ -97,7 +118,7 @@ bool RBEConfig::load_config_with_yaml(const std::string& filename) {
         cwd = config["cwd"].as<std::string>(get_cwd());
         project_root = config["project_root"].as<std::string>(cwd);
 
-        // default rbe properties
+        // default rbe properties (may be overwritten by user .devcontainer/devcontainer.json file)
         rbe_properties["container-image"] = "docker://docker.io/chanfun/ninja2_ubuntu:1.0";
         rbe_properties["workload-isolation-type"] = "docker";
         // read from user yaml file
@@ -110,7 +131,7 @@ bool RBEConfig::load_config_with_yaml(const std::string& filename) {
 
         return true;
     } catch (const std::exception& e) {
-        std::cerr << "Exception caught in read_yaml: " << e.what() << std::endl;
+        std::cout << "Waning: exception caught when read config.yaml: " << e.what() << std::endl;
         return false;
     }
 }

@@ -59,7 +59,7 @@ function install_dependencies {
 
 # Function to install the built ninja binary
 function install {
-  if [ ! -f "build/ninja" ]; then
+  if [ ! -f "build/bin/ninja" ]; then
     failure "Ninja binary not found in build directory. Please build first."
     exit 1
   fi
@@ -74,7 +74,7 @@ function install {
   fi
 
   # Install new ninja binary
-  sudo cp "build/ninja" "$install_path"
+  sudo cp "build/bin/ninja" "$install_path"
   success "New ninja installed at $install_path"
 }
 
