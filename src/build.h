@@ -31,6 +31,7 @@ struct Builder;
 struct DiskInterface;
 struct Edge;
 struct Node;
+struct RBEConfig;
 struct State;
 struct Status;
 
@@ -177,8 +178,8 @@ struct CommandRunner {
 
 /// Options (e.g. verbosity, parallelism) passed to a build.
 struct BuildConfig {
-  BuildConfig() : verbosity(NORMAL), dry_run(false), parallelism(1), cloud_build(false),
-                  share_build(false), failures_allowed(1), max_load_average(-0.0f) {}
+  BuildConfig() : verbosity(NORMAL), dry_run(false), parallelism(1),
+                  failures_allowed(1), max_load_average(-0.0f) {}
 
   enum Verbosity {
     QUIET,  // No output -- used when testing.
@@ -189,12 +190,15 @@ struct BuildConfig {
   Verbosity verbosity;
   bool dry_run;
 
-  bool cloud_build;     // remote api cloud build
-  std::string grpc_url; // remote api master addr 
-  std::string cwd;
-  std::string project_root;
-  bool share_build; // p2p share build
-  std::string master_addr; // p2p master addr
+  RBEConfig* rbe_config_ptr;
+
+  // bool cloud_build;     // remote api cloud build
+  // std::string grpc_url; // remote api master addr 
+  // std::string cwd;
+  // std::string project_root;
+  // bool share_build; // p2p share build
+  // std::string master_addr; // p2p master addr
+  // std::map<std::string, std::string> rbe_properties; // remote build execution properties
 
   int parallelism;
   int failures_allowed;

@@ -71,7 +71,7 @@
 #include "thread_pool.h"
 #include "share_build/ninjaRegisterService.h"
 #include "share_build/ninjaUnregisterService.h"
-#include "share_build/config.h"
+#include "rbe_config.h"
 
 using namespace std;
 using ninjaRegister::RegisterRequest;
@@ -1483,20 +1483,18 @@ int ReadFlags(int* argc, char*** argv,
          (opt = getopt_long(*argc, *argv, "s:c:r:d:f:j:k:l:nt:vw:C:h",
                             kLongOptions, NULL)) != -1) {
     switch (opt) {
-      case 's':
-        config->share_build = true;
-        config->master_addr = optarg;
-        sharebuild_config.masterAddr = optarg;
+      case 'p':
+        config->rbe_config_ptr->share_build = true;
+        config->rbe_config_ptr->master_addr = optarg;
         break;
       case 'c':
-        config->cloud_build = true;
-        config->grpc_url = optarg;
-        if (config->grpc_url.compare(0, 7, "grpc://") != 0)
+        config->rbe_config_ptr->cloud_build = true;
+        config->rbe_config_ptr->grpc_url = optarg;
+        if (config->rbe_config_ptr->grpc_url.compare(0, 7, "grpc://") != 0)
           Fatal("invalid grpc url");
         break;
       case 'r':
-        config->project_root = optarg;
-        sharebuild_config.rootDir = optarg;
+        config->rbe_config_ptr->project_root = optarg;
         break;
       case 'd':
         if (!DebugEnable(optarg))
@@ -1592,6 +1590,7 @@ NORETURN void real_main(int argc, char** argv) {
   // Use exit() instead of return in this function to avoid potentially
   // expensive cleanup when destructing NinjaMain.
   BuildConfig config;
+  config.rbe_config_ptr = &g_rbe_config; 
   Options options = {};
   options.input_file = "build.ninja";
 
@@ -1615,29 +1614,29 @@ NORETURN void real_main(int argc, char** argv) {
     if (chdir(options.working_dir) < 0) {
       Fatal("chdir to '%s' - %s", options.working_dir, strerror(errno));
     }
-    config.cwd = options.working_dir;
-  } else if (config.cloud_build || config.share_build) {
+    config.rbe_config_ptr->cwd = options.working_dir;
+  } else if (config.rbe_config_ptr->cloud_build || config.rbe_config_ptr->share_build) { // TODO: 这里的 else if 其实可以删除
     string err;
-    if (!GetCurrentDirectory(&config.cwd, &err)) {
+    if (!GetCurrentDirectory(&(config.rbe_config_ptr->cwd), &err)) {
       Error(err.c_str());
       exit(1);
     }
-    if (config.project_root.empty())
-      config.project_root = config.cwd;
+    if (config.rbe_config_ptr->project_root.empty())
+      config.rbe_config_ptr->project_root = config.rbe_config_ptr->cwd;
   }
 
-  if (config.share_build) {
+  if (g_rbe_config.share_build) {
     cout << "启动 p2p share 分布式编译模式" << endl;
     // 注册ninja
-    bool registerSuccess = reg(sharebuild_config.ipv4_address, sharebuild_config.ninjaDir, sharebuild_config.masterAddr, sharebuild_config.rootDir);
+    bool registerSuccess = reg(g_rbe_config.self_ipv4_address, g_rbe_config.cwd, g_rbe_config.master_addr, g_rbe_config.project_root);
     if(!registerSuccess) {
       //注册失败
       cout << "注册失败" << endl;
-      config.share_build = false; //shut down share build
+      config.rbe_config_ptr->share_build = false; //shut down share build
     }
     cout << "sleep(3)" << endl;
     sleep(3);
-  } else if (config.cloud_build) {
+  } else if (g_rbe_config.cloud_build) {
     cout << "启动 remote api 分布式编译模式" << endl;
   } else {
     cout << "启动本地编译模式" << endl;
@@ -1703,10 +1702,10 @@ NORETURN void real_main(int argc, char** argv) {
     if (g_metrics)
       ninja.DumpMetrics();
 
-    if (config.share_build) {
+    if (g_rbe_config.share_build) {
 			std::cout << "注销" << std::endl;
 			// 注销ninja
-			bool unregisterSuccess = unReg(sharebuild_config.ipv4_address, sharebuild_config.ninjaDir, sharebuild_config.masterAddr, sharebuild_config.rootDir);
+			bool unregisterSuccess = unReg(g_rbe_config.self_ipv4_address, g_rbe_config.cwd, g_rbe_config.master_addr, g_rbe_config.project_root);
 
 			if (!unregisterSuccess) {
 				//注销失败

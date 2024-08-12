@@ -18,7 +18,9 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include "../rbe_config.h"
 
+struct RBEConfig;
 struct BuildConfig;
 struct Edge;
 

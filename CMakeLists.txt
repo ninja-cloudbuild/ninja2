@@ -152,6 +152,7 @@ add_library(libninja OBJECT
 	src/manifest_parser.cc
 	src/metrics.cc
 	src/missing_deps.cc
+	src/rbe_config.cc
 	src/thread_pool.cc
 	src/parser.cc
 	src/state.cc
@@ -164,7 +165,6 @@ add_library(libninja OBJECT
 	src/share_build/execute1Service.cc
 	src/share_build/ninjaRegisterService.cc
 	src/share_build/ninjaUnregisterService.cc
-	src/share_build/config.cc
 	src/share_build/share_thread.cc
 )
 
@@ -224,6 +224,18 @@ endif()
 if(CMAKE_SYSTEM_NAME STREQUAL "OS400" OR CMAKE_SYSTEM_NAME STREQUAL "AIX")
 	add_compile_definitions(__STDC_FORMAT_MACROS)
 endif()
+
+include(FetchContent)
+FetchContent_Declare(jsoncpp URL https://github.com/open-source-parsers/jsoncpp/archive/refs/tags/1.9.5.tar.gz)
+FetchContent_GetProperties(jsoncpp)
+if (NOT jsoncpp_POPULATED)
+    FetchContent_Populate(jsoncpp)
+    add_subdirectory(${jsoncpp_SOURCE_DIR} ${jsoncpp_BINARY_DIR})
+    message(${jsoncpp_SOURCE_DIR})
+    message(${jsoncpp_BINARY_DIR})
+endif ()
+target_link_libraries(libninja PRIVATE jsoncpp_static)
+
 
 # Main executable is library plus main() function.
 if(NINJA_BUILD_BINARY)
