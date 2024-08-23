@@ -234,6 +234,8 @@ if (NOT jsoncpp_POPULATED)
     message(${jsoncpp_SOURCE_DIR})
     message(${jsoncpp_BINARY_DIR})
 endif ()
+# set explicit paths(absolute path) for the include directories
+target_include_directories(libninja PRIVATE ${jsoncpp_SOURCE_DIR}/include)
 target_link_libraries(libninja PRIVATE jsoncpp_static)
 
 
