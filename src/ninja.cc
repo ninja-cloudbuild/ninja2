@@ -1493,9 +1493,11 @@ int ReadFlags(int* argc, char*** argv,
         if (config->rbe_config_ptr->grpc_url.compare(0, 7, "grpc://") != 0)
           Fatal("invalid grpc url");
         break;
-      case 'r':
-        config->rbe_config_ptr->project_root = optarg;
+      case 'r': {
+        std::string project_root = optarg;
+        config->rbe_config_ptr->init_proj_config(project_root);
         break;
+      }
       case 'd':
         if (!DebugEnable(optarg))
           return 1;
@@ -1590,7 +1592,7 @@ NORETURN void real_main(int argc, char** argv) {
   // Use exit() instead of return in this function to avoid potentially
   // expensive cleanup when destructing NinjaMain.
   BuildConfig config;
-  config.rbe_config_ptr = &g_rbe_config; 
+  config.rbe_config_ptr = &g_rbe_config;
   Options options = {};
   options.input_file = "build.ninja";
 
@@ -1626,20 +1628,20 @@ NORETURN void real_main(int argc, char** argv) {
   }
 
   if (g_rbe_config.share_build) {
-    cout << "启动 p2p share 分布式编译模式" << endl;
+    Warning("启动 p2p share 分布式编译模式");
     // 注册ninja
     bool registerSuccess = reg(g_rbe_config.self_ipv4_address, g_rbe_config.cwd, g_rbe_config.master_addr, g_rbe_config.project_root);
     if(!registerSuccess) {
       //注册失败
-      cout << "注册失败" << endl;
+      Warning("注册失败");
       config.rbe_config_ptr->share_build = false; //shut down share build
     }
-    cout << "sleep(3)" << endl;
+    Warning("sleep(3)");
     sleep(3);
   } else if (g_rbe_config.cloud_build) {
-    cout << "启动 remote api 分布式编译模式" << endl;
+    Info("启动 remote api 分布式编译模式");
   } else {
-    cout << "启动本地编译模式" << endl;
+    Info("启动本地编译模式");
   }
  
 
@@ -1703,14 +1705,13 @@ NORETURN void real_main(int argc, char** argv) {
       ninja.DumpMetrics();
 
     if (g_rbe_config.share_build) {
-			std::cout << "注销" << std::endl;
+			Info("注销");
 			// 注销ninja
 			bool unregisterSuccess = unReg(g_rbe_config.self_ipv4_address, g_rbe_config.cwd, g_rbe_config.master_addr, g_rbe_config.project_root);
 
 			if (!unregisterSuccess) {
 				//注销失败
-				cout << "注销失败" << endl;
-				exit(-1);
+				Fatal("注销失败");
 			}
     }
     exit(result);

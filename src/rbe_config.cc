@@ -19,29 +19,12 @@ RBEConfig g_rbe_config;
 
 
 RBEConfig::RBEConfig() {
-    // Users can adjust the overall options/parameters of RBE in the config.yaml file
+    // Users can adjust the overall options/parameters of RBE in the ninja2.conf file
     // TODO: support users in specifying a configuration file via command-line argument
-    std::string ninja2_project_dir = "/home/chanfun/merge_work/ninja2";
-    std::string config_path = ninja2_project_dir + "/config.yaml";
-    if (!load_config_with_yaml(config_path)) {
-        std::cout << "Waning: Failed to read RBE configuration." << std::endl;
+    std::string config_path = "/etc/ninja2.conf";
+    if (!load_server_config(config_path)) {
+        Fatal("Fail to read RBE server configuration.");
     }
-
-    // By reading the .devcontainer/devcontainer.json file, obtain the image address that allows the project to be successfully built.                                     
-    // When remote compilation is enabled, the build node will pull up a container using this image address to perform the build task. 
-    try {
-        std::string devcontainer_path = ninja2_project_dir + "/.devcontainer/devcontainer.json";
-        std::ifstream f(devcontainer_path);
-        Json::Value root;
-        f >> root;
-
-        std::string docker_prefix = "docker://";
-        rbe_properties["container-image"] = docker_prefix + root.get("image", "docker.io/chanfun/ninja2_ubuntu:1.0").asString();
-        rbe_properties["workload-isolation-type"] = "docker";
-    } catch (const std::exception& e) {
-        std::cout << "Waning: fail to parse image key-value from devcontainer.json: " << e.what() << std::endl;
-    }
-
 }
 
 std::ostream& operator<<(std::ostream& os, const RBEConfig& config) {
@@ -106,7 +89,7 @@ std::string RBEConfig::get_ipv4_address(size_t address_size) {
     return std::string(address);
 }
 
-bool RBEConfig::load_config_with_yaml(const std::string& filename) {
+bool RBEConfig::load_server_config(const std::string& filename) {
     try {
         YAML::Node config = YAML::LoadFile(filename);
         cloud_build = config["cloud_build"].as<bool>(false);
@@ -115,36 +98,32 @@ bool RBEConfig::load_config_with_yaml(const std::string& filename) {
         share_build = config["share_build"].as<bool>(false);
         master_addr = config["master_addr"].as<std::string>();
 
-        cwd = config["cwd"].as<std::string>(get_cwd());
-        project_root = config["project_root"].as<std::string>(cwd);
-
-        // default rbe properties (may be overwritten by user .devcontainer/devcontainer.json file)
-        rbe_properties["container-image"] = "docker://docker.io/chanfun/ninja2_ubuntu:1.0";
-        rbe_properties["workload-isolation-type"] = "docker";
-        // read from user yaml file
-        const YAML::Node& properties = config["rbe_properties"];
-        for (YAML::const_iterator it = properties.begin(); it != properties.end(); ++it) {
-            rbe_properties[it->first.as<std::string>()] = it->second.as<std::string>();
-        }
-
         self_ipv4_address = config["self_ipv4_address"].as<std::string>(get_ipv4_address());
-
         return true;
     } catch (const std::exception& e) {
-        std::cout << "Waning: exception caught when read config.yaml: " << e.what() << std::endl;
+        Warning("exception caught when read conf: %s", e.what());
         return false;
     }
 }
 
-// bool Config::read_yaml() {
-//     std::ifstream file("/home/ubuntu/.config/sharebuild/node/config.yaml");
-//     if (file.is_open()) {
-//         YAML::Node node = YAML::LoadFile("/home/ubuntu/.config/sharebuild/node/config.yaml");//读取文件
-//         std::string master_host = node["schedulerRegisterServer"]["host"].as<std::string>();
-//         std::string master_port = node["schedulerRegisterServer"]["port"].as<std::string>();
-//         masterAddr = master_host + ":" + master_port;
-//         std::cout << "从config.yaml中读出的master节点地址：" << masterAddr << std::endl;
-//         return true;
-//     }
-//     return false;
-// }
+void RBEConfig::init_proj_config(const std::string& project_root_path) {
+    cwd = get_cwd();
+    project_root = project_root_path;
+    
+    try {
+        // By reading the .devcontainer/devcontainer.json file, obtain the image address that allows the project to be successfully built.                                     
+        // When remote compilation is enabled, the build node will pull up a container using this image address to perform the build task. 
+        std::string devcontainer_path = project_root_path + "/.devcontainer/devcontainer.json";
+        std::ifstream f(devcontainer_path);
+        Json::Value root;
+        f >> root;
+
+        std::string docker_prefix = "docker://";
+        rbe_properties["container-image"] = docker_prefix + root.get("image", "").asString();
+        if (!rbe_properties["container-image"].empty()) {
+            rbe_properties["workload-isolation-type"] = "docker";
+        }
+    } catch (const std::exception& e) {
+        Warning("fail to parse image key-value from devcontainer.json: %s", e.what());
+    }
+}
