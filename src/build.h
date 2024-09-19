@@ -39,6 +39,8 @@ struct Status;
 struct EdgeWork {
   Edge* edge;
   bool remote; // Can run remotely, only valid in cloud build mode.
+  EdgeWork(Edge* edgePtr, bool isRemote = false) 
+        : edge(edgePtr), remote(isRemote) {}
 };
 
 
@@ -191,14 +193,6 @@ struct BuildConfig {
   bool dry_run;
 
   RBEConfig* rbe_config_ptr;
-
-  // bool cloud_build;     // remote api cloud build
-  // std::string grpc_url; // remote api master addr 
-  // std::string cwd;
-  // std::string project_root;
-  // bool share_build; // p2p share build
-  // std::string master_addr; // p2p master addr
-  // std::map<std::string, std::string> rbe_properties; // remote build execution properties
 
   int parallelism;
   int failures_allowed;

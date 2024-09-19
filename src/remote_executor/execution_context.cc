@@ -25,6 +25,7 @@
 #include "../build.h"
 #include "../remote_process.h"
 #include "../util.h"
+#include "../subprocess.h"
 
 namespace RemoteExecutor {
 
@@ -242,6 +243,47 @@ Action BuildAction(RemoteSpawn* spawn, const std::string& cwd,
   return action;
 }
 
+void BuildActionOutputs(RemoteSpawn* spawn, const std::string& cwd,
+    DigestStringMap* blobs, DigestStringMap* digest_files,
+    ActionResult *result) {
+  std::set<std::string> deps;
+  for (auto i : spawn->outputs)
+    deps.insert(i);
+
+  NestedDirectory nested_dir;
+  auto cmd_work_dir = CommonAncestorPath(deps, deps, cwd);
+  // BuildMerkleTree(deps, cmd_work_dir, &nested_dir, digest_files);
+  for (auto& dep : deps) {
+    std::string merklePath(dep);
+    if (merklePath[0] != '/' && !cwd.empty())
+      merklePath = cwd + "/" + merklePath;
+    merklePath = StaticFileUtils::NormalizePath(merklePath.c_str());
+    if (merklePath[0] == '/' &&
+        !StaticFileUtils::HasPathPrefix(merklePath,
+            RemoteSpawn::config->rbe_config_ptr->project_root)) {
+      continue;
+    }
+    File file(dep.c_str());
+    nested_dir.Add(file, merklePath.c_str());
+    (*digest_files)[file.digest] = dep;
+    OutputFile output;
+    output.mutable_digest()->CopyFrom(file.digest);
+    output.set_path(merklePath.c_str());
+    *result->add_output_files() = output;
+  }
+  if (!cmd_work_dir.empty()) {
+    cmd_work_dir = StaticFileUtils::NormalizePath(cmd_work_dir.c_str());
+    nested_dir.AddDirectory(cmd_work_dir.c_str());
+  }
+  const auto dir_digest = nested_dir.ToDigest(blobs);
+  const auto cmd_proto = GenerateCommandProto(spawn->arguments, deps, cmd_work_dir, 
+                                              spawn->config->rbe_config_ptr->rbe_properties);
+  const auto cmd_digest = MakeDigest(cmd_proto);
+  (*blobs)[cmd_digest] = cmd_proto.SerializeAsString();
+
+  return ;
+}
+
 constexpr auto kMetadataToolName = "Ninja_Remote";
 constexpr auto kMetadataToolVersion = "UnRelease";
 
@@ -299,10 +341,56 @@ void ExecutionContext::Execute(int fd, RemoteExecutor::RemoteSpawn* spawn,
   bool cached = false;
   ActionResult result;
   cached = re_client.FetchFromActionCache(action_digest, products, &result);
-  if (!cached) {
-    blobs[action_digest] = action.SerializeAsString();
-    UploadResources(&cas_client, blobs, digest_files);
-    result = re_client.ExecuteAction(action_digest, *stop_requested_, false);
+
+  // 本地和远程共享一套 cache
+  // TODO: 对于不能远程执行的任务，只能本地执行
+  // 但如果一个任务即可本地执行又可远程执行，优先远程执行。认为远程资源充足无上限。
+  if (!cached && !spawn->work.remote) {
+    // Execute locally
+    SubprocessSet subprocset;
+    Subprocess* subproc = subprocset.Add(spawn->command);
+    if (!subproc){
+      Warning("Error while `Execute locally and Update to ActionCache`"); 
+      return;
+    }    
+    //wait for local run finished
+    subproc = NULL;
+    while ((subproc = subprocset.NextFinished()) == NULL) {
+      bool interrupted = subprocset.DoWork();
+      if (interrupted)
+        return ;
+    }
+    if(subproc->Finish() == ExitSuccess){
+      Warning("Execute locally: %s", subproc->GetOutput());
+    }
+    delete subproc;
+
+    DigestStringMap outblobs, outputs_digest_files;
+    BuildActionOutputs(spawn, cwd, &outblobs, &outputs_digest_files, &result);
+    outblobs[action_digest] = action.SerializeAsString();
+    try {
+      //todo:将生成文件上传上去
+      UploadResources(&cas_client, outblobs, outputs_digest_files);
+    } catch (const std::exception& e) {
+      Fatal("Error while uploading resources to CAS at \"%s\": %s",
+            spawn->config->rbe_config_ptr->grpc_url, e.what()); //CASServer
+    }
+    try {
+      cached = re_client.UpdateToActionCache(action_digest, &result);
+    } catch (const std::exception& e) {
+      Error("Error while querying action cache at \"%s\": %s",
+          spawn->config->rbe_config_ptr->grpc_url, e.what()); //ActionServer
+    }
+    exit_code = 0;
+    close(fd);
+    return;  
+  }
+
+  // remote 执行
+  if (!cached && spawn->work.remote) {
+      blobs[action_digest] = action.SerializeAsString();
+      UploadResources(&cas_client, blobs, digest_files);
+      result = re_client.ExecuteAction(action_digest, *stop_requested_, false);
   }
 
   const int _exit_code = result.exit_code();

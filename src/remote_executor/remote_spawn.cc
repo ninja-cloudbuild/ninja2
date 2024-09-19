@@ -23,8 +23,9 @@ namespace RemoteExecutor {
 
 const BuildConfig* RemoteSpawn::config = nullptr;
 
-RemoteSpawn* RemoteSpawn::CreateRemoteSpawn(Edge* edge) {
-  RemoteSpawn* spawn = new RemoteSpawn;
+RemoteSpawn* RemoteSpawn::CreateRemoteSpawn(const EdgeWork& work) {
+  RemoteSpawn* spawn = new RemoteSpawn(work);
+  Edge* edge = work.edge;
   std::string command = edge->EvaluateCommand();
   spawn->origin_command = command;
   spawn->command = command;

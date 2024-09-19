@@ -144,6 +144,32 @@ bool RemoteExecutionClient::FetchFromActionCache(const Digest &action_digest,
   return found;
 }
 
+bool RemoteExecutionClient::UpdateToActionCache(const Digest &action_digest, ActionResult *result) {
+  if (!ac_stub_)
+    Fatal("ActionCache Stub not Configured");
+  UpdateActionResultRequest action_req;
+  action_req.set_instance_name(ac_grpc_->InstanceName());
+  action_req.mutable_action_digest()->CopyFrom(action_digest);
+  *action_req.mutable_action_result() = *result;
+
+  ActionResult update_result;
+  bool update =false;
+  auto result_lambda = [&](grpc::ClientContext &context) {
+    const grpc::Status status = ac_stub_->UpdateActionResult(
+        &context, action_req,&update_result);
+        if(status.ok())
+         update=true;
+     if (status.error_code() == grpc::StatusCode::ALREADY_EXISTS){
+      update=true;
+      return grpc::Status::OK;
+      } // Shouldn't throw an exception
+    return status;
+  };
+  ac_grpc_->IssueRequest(result_lambda, "ActionCache.UpdateActionResult()",
+                         nullptr);
+   return update; 
+}
+
 ActionResult RemoteExecutionClient::ExecuteAction(const Digest &action_digest,
     const std::atomic_bool &stop_requested, bool skip_cache) {
   if (!(exec_stub_ && op_stub_))

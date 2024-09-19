@@ -33,6 +33,8 @@ public:
   bool FetchFromActionCache(const Digest &action_digest,
                             const std::set<std::string> &outputs,
                             ActionResult *result);
+  bool UpdateToActionCache(const Digest &action_digest,
+                            ActionResult *result);
   ActionResult ExecuteAction(const Digest &action_digest,
                              const std::atomic_bool &stop_requested,
                              bool skip_cache = false);
