@@ -341,15 +341,18 @@ void ExecutionContext::Execute(int fd, RemoteExecutor::RemoteSpawn* spawn,
   bool cached = false;
   ActionResult result;
   cached = re_client.FetchFromActionCache(action_digest, products, &result);
+  // Info("action cached is %d", cached);
 
   // 本地和远程共享一套 cache
-  // TODO: 对于不能远程执行的任务，只能本地执行
+  // 对于不能远程执行的任务，只能本地执行
   // 但如果一个任务即可本地执行又可远程执行，优先远程执行。认为远程资源充足无上限。
+  // spawn->work.remote = false; 时，只能本地执行
+  // spawn->work.remote = false;
   if (!cached && !spawn->work.remote) {
     // Execute locally
     SubprocessSet subprocset;
     Subprocess* subproc = subprocset.Add(spawn->command);
-    if (!subproc){
+    if (!subproc) {
       Warning("Error while `Execute locally and Update to ActionCache`"); 
       return;
     }    
@@ -360,8 +363,8 @@ void ExecutionContext::Execute(int fd, RemoteExecutor::RemoteSpawn* spawn,
       if (interrupted)
         return ;
     }
-    if(subproc->Finish() == ExitSuccess){
-      Warning("Execute locally: %s", subproc->GetOutput());
+    if (subproc->Finish() == ExitSuccess) {
+      Warning("Execute locally: %s", subproc->GetOutput().c_str());
     }
     delete subproc;
 
@@ -369,17 +372,18 @@ void ExecutionContext::Execute(int fd, RemoteExecutor::RemoteSpawn* spawn,
     BuildActionOutputs(spawn, cwd, &outblobs, &outputs_digest_files, &result);
     outblobs[action_digest] = action.SerializeAsString();
     try {
-      //todo:将生成文件上传上去
+      // 上传文件至 CAS cache
       UploadResources(&cas_client, outblobs, outputs_digest_files);
     } catch (const std::exception& e) {
       Fatal("Error while uploading resources to CAS at \"%s\": %s",
-            spawn->config->rbe_config_ptr->grpc_url, e.what()); //CASServer
+            spawn->config->rbe_config_ptr->grpc_url.c_str(), e.what()); //CASServer
     }
     try {
+      // 更新 action cache
       cached = re_client.UpdateToActionCache(action_digest, &result);
     } catch (const std::exception& e) {
       Error("Error while querying action cache at \"%s\": %s",
-          spawn->config->rbe_config_ptr->grpc_url, e.what()); //ActionServer
+          spawn->config->rbe_config_ptr->grpc_url.c_str(), e.what()); //ActionServer
     }
     exit_code = 0;
     close(fd);

@@ -23,7 +23,7 @@ RBEConfig::RBEConfig() {
     // TODO: support users in specifying a configuration file via command-line argument
     std::string config_path = "/etc/ninja2.conf";
     if (!load_server_config(config_path)) {
-        Fatal("Fail to read RBE server configuration.");
+        Warning("Fail to read RBE server configuration.");
     }
 }
 

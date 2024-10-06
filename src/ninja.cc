@@ -1483,7 +1483,7 @@ int ReadFlags(int* argc, char*** argv,
          (opt = getopt_long(*argc, *argv, "s:c:r:d:f:j:k:l:nt:vw:C:h",
                             kLongOptions, NULL)) != -1) {
     switch (opt) {
-      case 'p':
+      case 's':
         config->rbe_config_ptr->share_build = true;
         config->rbe_config_ptr->master_addr = optarg;
         break;

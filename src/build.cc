@@ -179,8 +179,9 @@ void Plan::EdgeWanted(const Edge* edge) {
 }
 
 EdgeWork Plan::FindWork(unsigned mode) {
-  if (ready_.empty())
+  if (ready_.empty()) {
     return NULL;
+  }
 
   Edge* edge = ready_.top();
   ready_.pop();
@@ -895,6 +896,8 @@ bool CloudCommandRunner::StartCommand(const EdgeWork& work) {
 bool CloudCommandRunner::WaitForCommand(Result* result) {
   Subprocess* subproc;
   RemoteProcess* remoteproc;
+  SubprocessSet* tmp = new SubprocessSet();
+
   while (true) {
     // if ((subproc = local_runner->subprocs_.NextFinished()) != NULL)
     //   break;
@@ -903,6 +906,8 @@ bool CloudCommandRunner::WaitForCommand(Result* result) {
     // 回收 local_runner 执行的结果 pselect/ppoll fd
     // if (remote_procs_.DoWork(&local_runner->subprocs_))
     //   return false;
+    if (remote_procs_.DoWork(tmp))
+      return false;
   }
   // if (subproc) {
   //   result->status = subproc->Finish();
@@ -920,6 +925,7 @@ bool CloudCommandRunner::WaitForCommand(Result* result) {
   result->edge = e->second;
   remoteproc_to_edge.erase(e);
   delete remoteproc;
+  delete tmp;
   return true;
 }
 
