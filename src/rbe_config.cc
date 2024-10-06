@@ -23,7 +23,7 @@ RBEConfig::RBEConfig() {
     // TODO: support users in specifying a configuration file via command-line argument
     std::string config_path = "/etc/ninja2.conf";
     if (!load_server_config(config_path)) {
-        Warning("Fail to read RBE server configuration.");
+        Warning("Fail to read RBE server configuration from %s", config_path.c_str());
     }
 }
 
@@ -124,6 +124,7 @@ void RBEConfig::init_proj_config(const std::string& project_root_path) {
             rbe_properties["workload-isolation-type"] = "docker";
         }
     } catch (const std::exception& e) {
-        Warning("fail to parse image key-value from devcontainer.json: %s", e.what());
+        // 用户无感知式的读取项目相关的 RBE 配置信息
+        // Warning("fail to parse image key-value from devcontainer.json: %s", e.what());
     }
 }
