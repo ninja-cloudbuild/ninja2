@@ -1,0 +1,105 @@
+name: ninja2-CI
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  pull_request:
+    branches:
+      - master
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+
+    steps:
+      # 1. 检出代码
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # 2. 配置 apt 使用更快的镜像源（可选，根据地域选择）
+      - name: Configure apt to use faster mirrors
+        run: |
+          sudo sed -i 's/archive.ubuntu.com/mirrors.aliyun.com/g' /etc/apt/sources.list
+          sudo apt-get update
+
+      # 3. 缓存 apt 包
+      # - name: Cache apt packages
+      #   id: apt-cache
+      #   uses: actions/cache@v3
+      #   with:
+      #     path: |
+      #       /var/cache/apt
+      #       /var/lib/apt
+      #     key: ${{ runner.os }}-apt-${{ hashFiles('**/build.sh') }}
+      #     restore-keys: |
+      #       ${{ runner.os }}-apt-
+
+      # 4. 安装依赖
+      - name: Install dependencies
+        # if: steps.apt-cache.outputs.cache-hit != 'true' （仅在缓存未命中时）
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git cmake g++ gcc googletest libgmock-dev libgoogle-glog-dev libssl-dev pkg-config uuid-dev grpc++ libprotobuf-dev protobuf-compiler-grpc ninja-build libyaml-cpp-dev
+
+      # # 5. 缓存 CMake 和构建产物（可选）
+      # - name: Cache CMake and build
+      #   uses: actions/cache@v3
+      #   with:
+      #     path: |
+      #       ~/.cache
+      #       build
+      #     key: ${{ runner.os }}-cmake-${{ hashFiles('**/CMakeLists.txt') }}
+      #     restore-keys: |
+      #       ${{ runner.os }}-cmake-
+
+      # 6. 运行构建脚本
+      - name: Build ninja2
+        run: |
+          chmod +x build.sh
+          ./build.sh build
+
+      # 7. 安装构建好的 ninja2
+      - name: Install ninja2
+        run: |
+          sudo ./build.sh install
+
+      # 8. 验证 ninja2 安装
+      - name: Verify ninja2 installation
+        run: |
+          ninja --version
+
+      # 9. 运行 Ninja 单元测试套件
+      - name: Run Ninja unit-test suite
+        run: |
+          cd build/bin
+          ctest --output-on-failure
+
+      # 10. 克隆 re2 项目
+      - name: Clone re2 repository
+        run: |
+          wget https://github.com/google/re2/archive/refs/tags/2021-11-01.tar.gz
+          tar -zxvf 2021-11-01.tar.gz
+          mv re2-2021-11-01 re2
+
+      # 11. 使用 ninja2 构建 re2 项目 （re2 项目较小，快速验证效果）
+      - name: Local Build re2 with ninja2
+        run: |
+          cd re2
+          mkdir -p build
+          cd build
+          cmake -G Ninja ..
+          ninja
+
+      # 11. 运行 re2 测试
+      - name: Test re2 build
+        run: |
+          cd re2/build
+          ./re2_test
+          # ctest --output-on-failure
+
+      # TODO:
+      #  1. remote build re2 with ninja2.
+      #  2. more testing projects.
