@@ -56,8 +56,7 @@ struct Plan {
 
   // Pop a ready edge off the queue of edges to build.
   // Returns NULL if there's no work to do.
-  /// @param mode 0 local or p2p share build, 1 cloud remote, other local/remote
-  EdgeWork FindWork(unsigned mode = 0);
+  EdgeWork FindWork();
 
   /// Returns true if there's more work to be done.
   bool more_to_do() const { return wanted_edges_ > 0 && command_edges_ > 0; }
@@ -139,8 +138,6 @@ private:
   std::map<Edge*, Want> want_;
 
   EdgePriorityQueue ready_;
-  EdgePriorityQueue local_ready_;
-
 
   Builder* builder_;
   /// user provided targets in build order, earlier one have higher priority
@@ -159,7 +156,6 @@ private:
 struct CommandRunner {
   virtual ~CommandRunner() {}
   virtual size_t CanRunMore() const = 0;
-  virtual unsigned CommandMode() { return 0; } // non-cloud build.
   virtual bool StartCommand(const EdgeWork& work) = 0;
 
 

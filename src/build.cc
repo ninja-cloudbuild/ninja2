@@ -178,7 +178,7 @@ void Plan::EdgeWanted(const Edge* edge) {
   }
 }
 
-EdgeWork Plan::FindWork(unsigned mode) {
+EdgeWork Plan::FindWork() {
   if (ready_.empty()) {
     return NULL;
   }
@@ -188,56 +188,8 @@ EdgeWork Plan::FindWork(unsigned mode) {
   // 可以远程执行一律放到远程执行
   bool remote = RemoteExecutor::RemoteSpawn::CanExecuteRemotelly(edge);
   return {edge, remote};
-
-
-  ///// TODO: delete below
-  // if (mode==0) { // only local && p2p share build.
-  //   if (!local_ready_.empty()) { // find first in local_ready
-  //     Edge* e = local_ready_.top();
-  //     local_ready_.pop();
-  //     return {e, false};
-  //   }
-  //   if (ready_.empty()) {  // then find in ready
-  //     return {nullptr, false};
-  //   }
-
-  //   Edge* e = ready_.top();
-  //   ready_.pop();
-  //   return {e, false};
-  // } else if (mode == 1) { // only remote
-  //   while (!ready_.empty()) { // find first remote edge in ready
-  //     Edge* e = ready_.top();
-  //     ready_.pop();
-  //     if (RemoteExecutor::RemoteSpawn::CanExecuteRemotelly(e))
-  //       return {e, true};
-  //     else 
-  //       local_ready_.push(e);
-  //   }
-  //   return {nullptr, true}; // none can remote, true takes no effect
-  // } else { // local or remote
-  //   if (!local_ready_.empty()) { // check local_ready first
-  //     Edge* e = local_ready_.top();
-  //     local_ready_.pop();
-  //     return {e, false};
-  //   }
-  //   if (ready_.empty()) {
-  //     return {nullptr,false};
-  //   }
-  //   Edge* e = ready_.top(); // just find next ready
-  //   ready_.pop();
-  //   bool remote=RemoteExecutor::RemoteSpawn::CanExecuteRemotelly(e);
-  //   return {e, remote};
-  // }
 }
 
-// Edge* Plan::FindWork() {
-//   if (ready_.empty())
-//     return NULL;
-
-//   Edge* work = ready_.top();
-//   ready_.pop();
-//   return work;
-// }
 
 void Plan::ScheduleWork(map<Edge*, Want>::iterator want_e) {
   if (want_e->second == kWantToFinish) {
@@ -829,34 +781,18 @@ constexpr int proportion = 3; //Best result from benchmark
 
 struct CloudCommandRunner : public CommandRunner {
   explicit CloudCommandRunner(const BuildConfig& config)
-      : config_(config), busyStatus(NO_BUSY),
-        // local_runner(new RealCommandRunner(config)),
-        remote_procs_(config.parallelism * proportion) {}
+      : config_(config), remote_procs_(config.parallelism * proportion) {}
   virtual ~CloudCommandRunner() {}
   virtual size_t CanRunMore() const;
-  /// Allow change command type by runner status
-  /// @return 0 only local, 1 only remote, 2 local or remote
-  virtual unsigned CommandMode() { return 2 - busyStatus; }
   virtual bool StartCommand(const EdgeWork& work);
   virtual bool WaitForCommand(Result* result);
   virtual vector<Edge*> GetActiveEdges();
   virtual void Abort();
 
-  enum { NO_BUSY = 0, LOCAL_BUSY = 1, REMOTE_BUSY = 2, ALL_BUSY = 3 };
   const BuildConfig& config_;
-  mutable unsigned busyStatus;
-  // std::unique_ptr<RealCommandRunner> local_runner;
   RemoteProcessSet remote_procs_;
   map<const RemoteProcess*, Edge*> remoteproc_to_edge;
 };
-
-// size_t CloudCommandRunner::CanRunMore() const {
-//   local_runner->CanRunMore();
-//   busyStatus = local_runner->CanRunMore() > 0 ? 0 : LOCAL_BUSY;
-//   if (remote_procs_.ThreadPoolAlreadyFull())
-//     busyStatus |= REMOTE_BUSY;
-//   return busyStatus != ALL_BUSY;
-// }
 
 
 size_t CloudCommandRunner::CanRunMore() const {
@@ -882,8 +818,6 @@ size_t CloudCommandRunner::CanRunMore() const {
 }
 
 bool CloudCommandRunner::StartCommand(const EdgeWork& work) {
-  // if (!work.remote)
-  //   return local_runner->StartCommand(work);
   string command = work.edge->EvaluateCommand();
   auto spawn = RemoteExecutor::RemoteSpawn::CreateRemoteSpawn(work);
   RemoteProcess* remoteproc = remote_procs_.Add(spawn);
@@ -899,25 +833,12 @@ bool CloudCommandRunner::WaitForCommand(Result* result) {
   SubprocessSet* tmp = new SubprocessSet();
 
   while (true) {
-    // if ((subproc = local_runner->subprocs_.NextFinished()) != NULL)
-    //   break;
     if ((remoteproc = remote_procs_.NextFinished()) != NULL)
       break;
-    // 回收 local_runner 执行的结果 pselect/ppoll fd
-    // if (remote_procs_.DoWork(&local_runner->subprocs_))
-    //   return false;
+    // Dowork 内部会更新 RemoteProcess 的 running_, finished_ 队列
     if (remote_procs_.DoWork(tmp))
       return false;
   }
-  // if (subproc) {
-  //   result->status = subproc->Finish();
-  //   result->output = subproc->GetOutput();
-  //   auto e = local_runner->subproc_to_edge_.find(subproc);
-  //   result->edge = e->second;
-  //   local_runner->subproc_to_edge_.erase(e);
-  //   delete subproc;
-  //   return true;
-  // }
   assert(remoteproc != NULL);
   result->status = remoteproc->Finish();
   result->output = remoteproc->GetOutput();
@@ -929,9 +850,7 @@ bool CloudCommandRunner::WaitForCommand(Result* result) {
   return true;
 }
 
-// TODO: 实现 GetActiveEdges()
 vector<Edge*> CloudCommandRunner::GetActiveEdges() {
-  // return local_runner->GetActiveEdges();
   vector<Edge*> edges;
   for (map<const RemoteProcess*, Edge*>::iterator e = remoteproc_to_edge.begin();
        e != remoteproc_to_edge.end(); ++e)
@@ -940,7 +859,6 @@ vector<Edge*> CloudCommandRunner::GetActiveEdges() {
 }
 
 void CloudCommandRunner::Abort() {
-  // local_runner->Abort();
   remote_procs_.Clear();
 }
 
@@ -1076,39 +994,9 @@ bool Builder::Build(string* err) {
   while (plan_.more_to_do()) {
     // See if we can start any more commands.
     if (failures_allowed) {
-      // if (config_.rbe_config_ptr->cloud_build) {
-      //   if (command_runner_->CanRunMore() > 0) {
-      //     auto work = plan_.FindWork(command_runner_->CommandMode());
-      //     if (Edge* edge = work.edge) {
-      //       if (edge->GetBindingBool("generator")) {
-      //         scan_.build_log()->Close();
-      //       }
-
-      //       if (!StartEdge(work, err)) {
-      //         Cleanup();
-      //         status_->BuildFinished();
-      //         return false;
-      //       }
-
-      //       if (edge->is_phony()) {
-      //         if (!plan_.EdgeFinished(edge, Plan::kEdgeSucceeded, err)) {
-      //           Cleanup();
-      //           status_->BuildFinished();
-      //           return false;
-      //         }
-      //       } else {
-      //         ++pending_commands;
-      //       }
-
-      //       // We made some progress; go back to the main loop.
-      //       continue;
-      //     }
-      //   }
-        
-      // } else { // share build(p2p) or local build.
         size_t capacity = command_runner_->CanRunMore();
         while (capacity > 0) {
-          auto work = plan_.FindWork(command_runner_->CommandMode());
+          auto work = plan_.FindWork();
           Edge* edge=work.edge;
           if (!edge)
             break;
@@ -1144,7 +1032,6 @@ bool Builder::Build(string* err) {
         // We are finished with all work items and have no pending
         // commands. Therefore, break out of the main loop.
         if (pending_commands == 0 && !plan_.more_to_do()) break;
-      // } // else p2p
     }
 
     // See if we can reap any finished commands.
