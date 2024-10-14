@@ -348,7 +348,7 @@ void ExecutionContext::Execute(int fd, RemoteExecutor::RemoteSpawn* spawn,
   // 但如果一个任务即可本地执行又可远程执行，优先远程执行。认为远程资源充足无上限。
   // spawn->work.remote = false; 时，只能本地执行
   // spawn->work.remote = false;
-  if (!cached && !spawn->work.remote) {
+  if (!cached && !spawn->can_remote) {
     // Execute locally
     SubprocessSet subprocset;
     Subprocess* subproc = subprocset.Add(spawn->command);
@@ -391,7 +391,7 @@ void ExecutionContext::Execute(int fd, RemoteExecutor::RemoteSpawn* spawn,
   }
 
   // remote 执行
-  if (!cached && spawn->work.remote) {
+  if (!cached && spawn->can_remote) {
       blobs[action_digest] = action.SerializeAsString();
       UploadResources(&cas_client, blobs, digest_files);
       result = re_client.ExecuteAction(action_digest, *stop_requested_, false);

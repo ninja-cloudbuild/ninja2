@@ -25,12 +25,11 @@
 struct RBEConfig;
 struct BuildConfig;
 struct Edge;
-struct EdgeWork;
 
 namespace RemoteExecutor {
 
 struct RemoteSpawn {
-  static RemoteSpawn* CreateRemoteSpawn(const EdgeWork& work);
+  static RemoteSpawn* CreateRemoteSpawn(Edge* edge);
   static bool CanExecuteRemotelly(Edge* edge);
 
   std::vector<std::string> GetHeaderFiles();
@@ -45,9 +44,9 @@ struct RemoteSpawn {
   std::vector<std::string> inputs;
   std::vector<std::string> outputs;
 
-  EdgeWork work;
-
-  RemoteSpawn(const EdgeWork& wk) : work(wk) {}
+  RemoteSpawn(Edge* ed, bool remote) : edge(ed), can_remote(remote) {}
+  Edge* edge;
+  bool can_remote;
   // private:
   //   RemoteSpawn() = default;
 };

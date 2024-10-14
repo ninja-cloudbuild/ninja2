@@ -36,14 +36,6 @@ struct State;
 struct Status;
 
 
-struct EdgeWork {
-  Edge* edge;
-  bool remote; // Can run remotely, only valid in cloud build mode.
-  EdgeWork(Edge* edgePtr, bool isRemote = false) 
-        : edge(edgePtr), remote(isRemote) {}
-};
-
-
 /// Plan stores the state of a build plan: what we intend to build,
 /// which steps we're ready to execute.
 struct Plan {
@@ -56,7 +48,7 @@ struct Plan {
 
   // Pop a ready edge off the queue of edges to build.
   // Returns NULL if there's no work to do.
-  EdgeWork FindWork();
+  Edge* FindWork();
 
   /// Returns true if there's more work to be done.
   bool more_to_do() const { return wanted_edges_ > 0 && command_edges_ > 0; }
@@ -156,7 +148,7 @@ private:
 struct CommandRunner {
   virtual ~CommandRunner() {}
   virtual size_t CanRunMore() const = 0;
-  virtual bool StartCommand(const EdgeWork& work) = 0;
+  virtual bool StartCommand(Edge* edge) = 0;
 
 
   /// The result of waiting for a command.
@@ -222,7 +214,7 @@ struct Builder {
   /// It is an error to call this function when AlreadyUpToDate() is true.
   bool Build(std::string* err);
 
-  bool StartEdge(const EdgeWork& edge, std::string* err);
+  bool StartEdge(Edge* edge, std::string* err);
 
   /// Update status ninja logs following a command termination.
   /// @return false if the build can not proceed further due to a fatal error.

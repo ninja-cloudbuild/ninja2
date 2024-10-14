@@ -69,9 +69,9 @@ struct DryRunCommandRunner : public CommandRunner {
   virtual ~DryRunCommandRunner() {}
 
   // Overridden from CommandRunner:
-  virtual size_t CanRunMore() const;
-  virtual bool StartCommand(const EdgeWork& work);
-  virtual bool WaitForCommand(Result* result);
+  virtual size_t CanRunMore() const override;
+  virtual bool StartCommand(Edge* edge) override;
+  virtual bool WaitForCommand(Result* result) override;
 
  private:
   queue<Edge*> finished_;
@@ -81,8 +81,8 @@ size_t DryRunCommandRunner::CanRunMore() const {
   return SIZE_MAX;
 }
 
-bool DryRunCommandRunner::StartCommand(const EdgeWork& work) {
-  finished_.push(work.edge);
+bool DryRunCommandRunner::StartCommand(Edge* edge) {
+  finished_.push(edge);
   return true;
 }
 
@@ -178,16 +178,14 @@ void Plan::EdgeWanted(const Edge* edge) {
   }
 }
 
-EdgeWork Plan::FindWork() {
+Edge* Plan::FindWork() {
   if (ready_.empty()) {
     return NULL;
   }
 
   Edge* edge = ready_.top();
   ready_.pop();
-  // 可以远程执行一律放到远程执行
-  bool remote = RemoteExecutor::RemoteSpawn::CanExecuteRemotelly(edge);
-  return {edge, remote};
+  return edge;
 }
 
 
@@ -620,9 +618,9 @@ void Plan::Dump() const {
 struct ShareCommandRunner : public CommandRunner {
   explicit ShareCommandRunner(const BuildConfig& config) : config_(config) {}
   virtual ~ShareCommandRunner() {}
-  virtual size_t CanRunMore() const;
-  virtual bool StartCommand(const EdgeWork& work);
-  virtual bool WaitForCommand(Result* result);
+  virtual size_t CanRunMore() const override;
+  virtual bool StartCommand(Edge* work) override;
+  virtual bool WaitForCommand(Result* result) override;
   virtual vector<Edge*> GetActiveEdges();
   virtual void Abort();
 
@@ -665,13 +663,13 @@ size_t ShareCommandRunner::CanRunMore() const {
   return capacity;
 }
 
-bool ShareCommandRunner::StartCommand(const EdgeWork& work) {
+bool ShareCommandRunner::StartCommand(Edge* edge) {
   EdgeCommand c;
-  c.command = work.edge->EvaluateCommand();
+  c.command = edge->EvaluateCommand();
   ShareThread* share_thread = share_threads_.Add(c);
   if (!share_thread)
     return false;
-  thread_to_edge_.insert(make_pair(share_thread, work.edge));
+  thread_to_edge_.insert(make_pair(share_thread, edge));
 
   return true;
 }
@@ -702,11 +700,11 @@ bool ShareCommandRunner::WaitForCommand(Result* result) {
 struct RealCommandRunner : public CommandRunner {
   explicit RealCommandRunner(const BuildConfig& config) : config_(config) {}
   virtual ~RealCommandRunner() {}
-  virtual size_t CanRunMore() const;
-  virtual bool StartCommand(const EdgeWork& edge);
-  virtual bool WaitForCommand(Result* result);
-  virtual vector<Edge*> GetActiveEdges();
-  virtual void Abort();
+  virtual size_t CanRunMore() const override;
+  virtual bool StartCommand(Edge* edge) override;
+  virtual bool WaitForCommand(Result* result) override;
+  virtual vector<Edge*> GetActiveEdges() override;
+  virtual void Abort() override;
 
   const BuildConfig& config_;
   SubprocessSet subprocs_;
@@ -747,12 +745,12 @@ size_t RealCommandRunner::CanRunMore() const {
   return capacity;
 }
 
-bool RealCommandRunner::StartCommand(const EdgeWork& work) {
-  string command = work.edge->EvaluateCommand();
-  Subprocess* subproc = subprocs_.Add(command, work.edge->use_console());
+bool RealCommandRunner::StartCommand(Edge* edge) {
+  string command = edge->EvaluateCommand();
+  Subprocess* subproc = subprocs_.Add(command, edge->use_console());
   if (!subproc)
     return false;
-  subproc_to_edge_.insert(make_pair(subproc, work.edge));
+  subproc_to_edge_.insert(make_pair(subproc, edge));
 
   return true;
 }
@@ -783,11 +781,11 @@ struct CloudCommandRunner : public CommandRunner {
   explicit CloudCommandRunner(const BuildConfig& config)
       : config_(config), remote_procs_(config.parallelism * proportion) {}
   virtual ~CloudCommandRunner() {}
-  virtual size_t CanRunMore() const;
-  virtual bool StartCommand(const EdgeWork& work);
-  virtual bool WaitForCommand(Result* result);
-  virtual vector<Edge*> GetActiveEdges();
-  virtual void Abort();
+  virtual size_t CanRunMore() const override;
+  virtual bool StartCommand(Edge* work) override;
+  virtual bool WaitForCommand(Result* result) override;
+  virtual vector<Edge*> GetActiveEdges() override;
+  virtual void Abort() override;
 
   const BuildConfig& config_;
   RemoteProcessSet remote_procs_;
@@ -817,13 +815,13 @@ size_t CloudCommandRunner::CanRunMore() const {
   return capacity;
 }
 
-bool CloudCommandRunner::StartCommand(const EdgeWork& work) {
-  string command = work.edge->EvaluateCommand();
-  auto spawn = RemoteExecutor::RemoteSpawn::CreateRemoteSpawn(work);
+bool CloudCommandRunner::StartCommand(Edge* edge) {
+  string command = edge->EvaluateCommand();
+  auto spawn = RemoteExecutor::RemoteSpawn::CreateRemoteSpawn(edge);
   RemoteProcess* remoteproc = remote_procs_.Add(spawn);
   if (!remoteproc)
     return false;
-  remoteproc_to_edge.insert(make_pair(remoteproc, work.edge));
+  remoteproc_to_edge.insert(make_pair(remoteproc, edge));
   return true;
 }
 
@@ -996,8 +994,7 @@ bool Builder::Build(string* err) {
     if (failures_allowed) {
         size_t capacity = command_runner_->CanRunMore();
         while (capacity > 0) {
-          auto work = plan_.FindWork();
-          Edge* edge=work.edge;
+          Edge* edge = plan_.FindWork();
           if (!edge)
             break;
 
@@ -1005,7 +1002,7 @@ bool Builder::Build(string* err) {
             scan_.build_log()->Close();
           }
 
-          if (!StartEdge(work, err)) {
+          if (!StartEdge(edge, err)) {
             Cleanup();
             status_->BuildFinished();
             return false;
@@ -1080,9 +1077,8 @@ bool Builder::Build(string* err) {
   return true;
 }
 
-bool Builder::StartEdge(const EdgeWork& work, string* err) {
+bool Builder::StartEdge(Edge* edge, string* err) {
   METRIC_RECORD("StartEdge");
-  Edge* edge=work.edge;
   if (edge->is_phony())
     return true;
 
@@ -1120,7 +1116,7 @@ bool Builder::StartEdge(const EdgeWork& work, string* err) {
   }
 
   // start command computing and run it
-  if (!command_runner_->StartCommand(work)) {
+  if (!command_runner_->StartCommand(edge)) {
     err->assign("command '" + edge->EvaluateCommand() + "' failed.");
     return false;
   }
