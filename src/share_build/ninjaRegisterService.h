@@ -10,12 +10,14 @@ using ninjaRegister::RegisterResponse;
 using ninjaRegister::RegisterService;
 
 class RegisterClient {
-    public:
-        RegisterClient(std::shared_ptr<Channel> channel);
+ public:
+  RegisterClient(std::shared_ptr<Channel> channel);
 
-        // 组装客户的有效载荷，发送它并呈现服务器的响应
-        bool Register(const std::string& ninja_host, const std::string& ninja_dir, const std::string& root_dir);
+  // 组装客户的有效载荷，发送它并呈现服务器的响应
+  bool Register(const std::string& ninja_host, const std::string& ninja_dir,
+                const std::string& root_dir,
+                const std::string& container_image);
 
-    private:
-        std::unique_ptr<RegisterService::Stub> stub_;
+ private:
+  std::unique_ptr<RegisterService::Stub> stub_;
 };

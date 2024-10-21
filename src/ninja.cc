@@ -1574,17 +1574,23 @@ int ReadFlags(int* argc, char*** argv,
   return -1;
 }
 
-bool reg(const std::string& ninja_host, const std::string& ninja_dir, const std::string& scheduler_addr, const std::string& root_dir) {
-    RegisterClient registerClient(grpc::CreateChannel(scheduler_addr, grpc::InsecureChannelCredentials()));
-    bool registerSuccess = registerClient.Register(ninja_host, ninja_dir, root_dir);
-    cout << "注册结果 registerSuccess is " << registerSuccess  << endl;
-    return registerSuccess;
+bool reg(const std::string& ninja_host, const std::string& ninja_dir,
+         const std::string& scheduler_addr, const std::string& root_dir, const std::string& container_image) {
+  RegisterClient registerClient(
+      grpc::CreateChannel(scheduler_addr, grpc::InsecureChannelCredentials()));
+  bool registerSuccess =
+      registerClient.Register(ninja_host, ninja_dir, root_dir, container_image);
+  cout << "注册结果 registerSuccess is " << registerSuccess << endl;
+  return registerSuccess;
 }
 
-bool unReg(const std::string& ninja_host, const std::string& ninja_dir, const std::string& scheduler_addr, const std::string& root_dir) {
-  UnregisterClient unregisterClient(grpc::CreateChannel(scheduler_addr, grpc::InsecureChannelCredentials()));
-  bool unregisterSuccess = unregisterClient.Unregister(ninja_host, ninja_dir, root_dir);
-  cout << "注册结果 unregisterSuccess is " << unregisterSuccess  << endl;
+bool unReg(const std::string& ninja_host, const std::string& ninja_dir,
+           const std::string& scheduler_addr, const std::string& root_dir) {
+  UnregisterClient unregisterClient(
+      grpc::CreateChannel(scheduler_addr, grpc::InsecureChannelCredentials()));
+  bool unregisterSuccess =
+      unregisterClient.Unregister(ninja_host, ninja_dir, root_dir);
+  cout << "注册结果 unregisterSuccess is " << unregisterSuccess << endl;
   return unregisterSuccess;
 }
 
@@ -1630,8 +1636,11 @@ NORETURN void real_main(int argc, char** argv) {
   if (g_rbe_config.share_build) {
     Warning("启动 p2p share 分布式编译模式");
     // 注册ninja
-    bool registerSuccess = reg(g_rbe_config.self_ipv4_address, g_rbe_config.cwd, g_rbe_config.master_addr, g_rbe_config.project_root);
-    if(!registerSuccess) {
+    bool registerSuccess =
+        reg(g_rbe_config.self_ipv4_address, g_rbe_config.cwd,
+            g_rbe_config.master_addr, g_rbe_config.project_root,
+            g_rbe_config.rbe_properties["container-image"]);
+    if (!registerSuccess) {
       //注册失败
       Warning("注册失败");
       config.rbe_config_ptr->share_build = false; //shut down share build
