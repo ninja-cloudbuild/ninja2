@@ -45,12 +45,12 @@ std::string Execute1Client::Execute1(const std::string& cmd, const std::string& 
 
     // Act upon its status.
     if (status.ok()) {
-        char buf[1024];
-        sprintf(buf, "success:%s,id:%s,stdOut:%s,stdErr:%s", 
-        reply.success().c_str(), reply.id().c_str(),
-        reply.std_out().c_str(), reply.std_err().c_str());
-        std::cout << "收到id=" << reply.id().c_str() << "的命令的执行结果" << std::endl;
-        return std::string(buf);
+        std::string result = " retcode:" + reply.success() +
+                            ",id:" + reply.id() +
+                            ",stdOut:" + reply.std_out() +
+                            ",stdErr:" + reply.std_err();
+        std::cout << result << std::endl;
+        return std::string(result);
     } else {
         std::cout << status.error_code() << ": " << status.error_message() << std::endl;
         return "RPC failed";
