@@ -37,18 +37,18 @@ function install_dependencies {
   case $OS_ID in
     ubuntu|debian)
       sudo apt-get update
-      sudo apt-get install -y git cmake g++ gcc googletest libgmock-dev libgoogle-glog-dev libssl-dev pkg-config uuid-dev grpc++ libprotobuf-dev protobuf-compiler-grpc ninja-build libyaml-cpp-dev
+      sudo apt-get install -y git cmake g++ gcc googletest libgmock-dev libssl-dev pkg-config uuid-dev grpc++ libprotobuf-dev protobuf-compiler-grpc ninja-build libyaml-cpp-dev
       ;;
     centos)
       sudo yum update -y
       sudo yum install -y epel-release
       sudo yum groupinstall -y "Development Tools"
-      sudo yum install -y git cmake3 gtest gtest-devel glog glog-devel openssl openssl-devel pkgconfig uuid-devel grpc-devel protobuf protobuf-devel protobuf-compiler ninja-build yaml-cpp yaml-cpp-devel
+      sudo yum install -y git cmake3 gtest gtest-devel openssl openssl-devel pkgconfig uuid-devel grpc-devel protobuf protobuf-devel protobuf-compiler ninja-build yaml-cpp yaml-cpp-devel
       ;;
     fedora)
       sudo dnf update -y
       sudo dnf group install -y "Development Tools"
-      sudo dnf install -y git cmake g++ gtest gtest-devel glog glog-devel openssl openssl-devel pkgconfig uuid-devel grpc-devel protobuf protobuf-devel protobuf-compiler ninja-build yaml-cpp yaml-cpp-devel
+      sudo dnf install -y git cmake g++ gtest gtest-devel openssl openssl-devel pkgconfig uuid-devel grpc-devel protobuf protobuf-devel protobuf-compiler ninja-build yaml-cpp yaml-cpp-devel
       ;;
     *)
       failure "Unsupported OS: $OS_ID"
