@@ -19,6 +19,7 @@ RBEConfig g_rbe_config;
 
 
 RBEConfig::RBEConfig() {
+     self_ipv4_address = get_ipv4_address();
     // Users can adjust the overall options/parameters of RBE in the ninja2.conf file
     // TODO: support users in specifying a configuration file via command-line argument
     std::string config_path = "/etc/ninja2.conf";
@@ -49,6 +50,19 @@ std::string RBEConfig::get_cwd() {
     } else {
         return std::strerror(errno);
     }
+}
+
+std::string execute_command(const char* cmd) {
+    std::array<char, 128> buffer;
+    std::string result;
+    std::unique_ptr<FILE, decltype(&pclose)> pipe(popen(cmd, "r"), pclose);
+    if (!pipe) {
+        throw std::runtime_error("popen() failed!");
+    }
+    while (fgets(buffer.data(), buffer.size(), pipe.get()) != nullptr) {
+        result += buffer.data();
+    }
+    return result;
 }
 
 std::string RBEConfig::get_ipv4_address(size_t address_size) {
@@ -85,7 +99,19 @@ std::string RBEConfig::get_ipv4_address(size_t address_size) {
 
     // 释放网络接口地址信息列表
     freeifaddrs(ifaddr);
-    
+
+    // 如果通过网络接口没有找到有效 IP 地址，尝试通过命令获取
+    if (strlen(address) == 0) {
+        std::cout << "Failed to obtain IP address via network interface, trying command..." << std::endl;
+        try {
+            std::string command_result = execute_command("hostname -I");
+            std::istringstream iss(command_result);
+            iss >> address;  // 获取第一个非回环 IP 地址
+        } catch (const std::runtime_error& e) {
+            std::cerr << "Failed to obtain IP address via command: " << e.what() << std::endl;
+            return "";
+        }
+    }
     return std::string(address);
 }
 
@@ -97,7 +123,6 @@ bool RBEConfig::load_server_config(const std::string& filename) {
 
         share_build = config["share_build"].as<bool>(false);
         master_addr = config["master_addr"].as<std::string>();
-
         self_ipv4_address = config["self_ipv4_address"].as<std::string>(get_ipv4_address());
         return true;
     } catch (const std::exception& e) {
