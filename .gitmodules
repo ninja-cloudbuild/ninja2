@@ -1,0 +1,3 @@
+[submodule "sharebuild"]
+	path = sharebuild
+	url = https://gitee.com/cloudbuild888/sharebuild.git
