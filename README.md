@@ -21,7 +21,9 @@ cd ninja2
 
 2. install: `./build.sh install`
 
-3. clean: `./build.sh clean` or `rm -rf ./build`
+3. package: `./build.sh package`
+
+4. clean: `./build.sh clean` or `rm -rf ./build`
 
 ### Developing in vscode-devcontainer
 
