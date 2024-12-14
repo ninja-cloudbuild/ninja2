@@ -121,5 +121,5 @@ Then open `doc/doxygen/html/index.html` in a browser to look at it.
 
 # License
 
-* Ninja2 and CloudBuild are released under a dual license of AGPL-3.0 and a paid commercial license.
+* [Ninja2](https://github.com/ninja-cloudbuild/ninja2) and [CloudBuild](https://gitee.com/cloudbuild888/cloudbuild) are released under a dual license of AGPL-3.0 and a paid commercial license.
 * [Ninja](https://github.com/ninja-build/ninja) is released under Apache License 2.0.
