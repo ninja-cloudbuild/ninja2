@@ -78,6 +78,20 @@ function install {
   success "New ninja installed at $install_path"
 }
 
+# Function to package the built ninja binary
+function package {
+  if [ ! -f "build/bin/ninja" ]; then
+    failure "Ninja binary not found in build directory. Please build first."
+    exit 1
+  fi
+  
+  # package new ninja binary
+  mkdir build/bin/ninja2
+  cp "build/bin/ninja" "build/bin/ninja2/"
+  (cd build/bin/ && tar -zcvf ninja2.tar.gz ninja2/* && rm -rf ninja2)
+  success "New Ninja2 package ninja2.tar.gz at build/bin/"
+}
+
 # Function to install dependencies and build the project
 function build {
   success "begin build: "
@@ -104,8 +118,11 @@ case "$1" in
   install)
     install
     ;;
+  package|pkg)
+    package
+    ;;
   *)
-    echo "Usage: $0 {build|clean|install}"
+    echo "Usage: $0 {build|clean|install|package}"
     exit 1
     ;;
 esac

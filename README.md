@@ -1,3 +1,34 @@
+# Ninja2
+
+Ninja2 is the second generation of Ninja that supports CloudBuild(Distributed Build System) and Ninja2 is fully compatible with the Ninja.
+
+CloudBuild refer to https://gitee.com/cloudbuild888/cloudbuild
+
+## QuickStart
+
+### Install the latest prebuild release version
+
+```
+wget -c https://raw.githubusercontent.com/ninja-cloudbuild/ninja2/refs/heads/main/install.sh && chmod +x install.sh && sudo ./install.sh
+```
+### Build & install from source code
+
+```
+git clone https://github.com/ninja-cloudbuild/ninja2.git
+cd ninja2
+```
+1. build: `./build.sh build`
+
+2. install: `./build.sh install`
+
+3. clean: `./build.sh clean` or `rm -rf ./build`
+
+### Developing in vscode-devcontainer
+
+1. environment prepare: https://code.visualstudio.com/docs/devcontainers/containers
+
+2. developing inside a Container: Press F1 in VS Code and execute the command "DevContainers: Reopen in Container".
+
 # Ninja
 
 Ninja is a small build system with a focus on speed.
@@ -86,35 +117,7 @@ ninja doxygen
 
 Then open `doc/doxygen/html/index.html` in a browser to look at it.
 
+# License
 
-
-# Ninja2
-
-## QuickStart
-
-### Local build & install
-
-1. build: `./build.sh build`
-
-2. install: `./build.sh install`
-
-3. clean: `./build.sh clean` or `rm -rf ./build`
-
-### Docker
-
-1. From the project directory, build the Docker image using the provided Dockerfile: 
-
-   `docker build -t ninja2-cloud . `.
-
-2. Run container:
-
-   `docker run -rm -it ninja2-cloud`.
-
-    --rm flag cleans up the container after it exits, and -it allows interaction with the container.
-
-### vscode-devcontainer
-
-1. environment prepare: https://code.visualstudio.com/docs/devcontainers/containers
-
-2. developing inside a Container: Press F1 in VS Code and execute the command "DevContainers: Reopen in Container".
-
+* Ninja2 and CloudBuild are released under a dual license of AGPL-3.0 and a paid commercial license.
+* [Ninja](https://github.com/ninja-build/ninja) is released under Apache License 2.0.
