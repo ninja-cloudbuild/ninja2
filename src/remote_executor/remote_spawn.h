@@ -20,9 +20,7 @@
 #include <vector>
 
 #include "../build.h"
-#include "../rbe_config.h"
 
-struct RBEConfig;
 struct BuildConfig;
 struct Edge;
 

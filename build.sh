@@ -96,9 +96,12 @@ EOL
 function build {
   # Create build directory and build
   mkdir -p build
-  (cd build && cmake -G Ninja .. && ninja)
+  if [ ! -f "build/build.ninja" ]; then
+    (cd build && cmake -G Ninja ..)
+  fi
+  (cd build && ninja)
 
-  success "Build succeed. Build output is located in $(pwd)"
+  success "Build successfully. Build output is located in build/bin/"
 }
 
 # Main script

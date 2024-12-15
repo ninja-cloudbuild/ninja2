@@ -68,7 +68,7 @@ function install {
   # Backup existing /etc/ninja2.conf if it exists
   if [ -f "$config_file" ]; then
     sudo mv "$config_file" "$backup_config_file"
-    success "Backed up original ninja to $backup_config_file"
+    success "Backed up original $config_file to $backup_config_file"
   fi
 
   # Install new ninja binary

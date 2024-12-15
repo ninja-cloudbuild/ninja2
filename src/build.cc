@@ -57,7 +57,6 @@
 #endif
 
 using namespace std;
-#include "rbe_config.h"
 #include "share_build/share_thread.h"
 
 #include <grpcpp/grpcpp.h>
@@ -969,12 +968,12 @@ bool Builder::Build(string* err) {
     if (config_.dry_run)
       command_runner_.reset(new DryRunCommandRunner);
 #ifdef CLOUD_BUILD_SUPPORT
-    else if (config_.rbe_config_ptr->cloud_build) {
+    else if (config_.cloud_run) {
       RemoteExecutor::RemoteSpawn::config = &config_;
       command_runner_.reset(new CloudCommandRunner(config_));
     }
 #endif
-    else if (config_.rbe_config_ptr->share_build) {
+    else if (config_.share_run) {
         command_runner_.reset(new ShareCommandRunner(config_));
     } else {
         command_runner_.reset(new RealCommandRunner(config_));

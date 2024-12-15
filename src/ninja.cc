@@ -20,15 +20,6 @@
 
 #include <algorithm>
 #include <cstdlib>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <net/if.h>
-#include <arpa/inet.h>
-#include <ifaddrs.h>
-#include <cstdlib>
-#include <fstream>
-
 
 #ifdef _WIN32
 #include "getopt.h"
@@ -63,23 +54,10 @@
 
 #ifndef _WIN32
 #include "thread_pool.h"
+#include "rbe_config.h"
 #endif
 
-#include <deque>
-#include <unordered_map>
-#include <unordered_set>
-#include "thread_pool.h"
-#include "share_build/ninjaRegisterService.h"
-#include "share_build/ninjaUnregisterService.h"
-#include "rbe_config.h"
-
 using namespace std;
-using ninjaRegister::RegisterRequest;
-using ninjaRegister::RegisterResponse;
-using ninjaRegister::RegisterService;
-using ninjaUnregister::UnregisterRequest;
-using ninjaUnregister::UnregisterResponse;
-using ninjaUnregister::UnregisterService;
 
 #ifdef _WIN32
 // Defined in msvc_helper_main-win32.cc.
@@ -251,11 +229,11 @@ void Usage(const BuildConfig& config) {
 "  -v, --verbose  show all command lines while building\n"
 "  --quiet        don't show progress status, just command output\n"
 "\n"
-"  remote options: Make sure a remote compilation server is running at the\n"
-"                  specified `server_addr` before using these options.\n"
-"  -c server_addr        remote cloud build mode (remote execution api)\n"
-"  -s server_addr        remote share build mode (p2p)\n"
-"  -r project_root_dir   only valid in remote build mode\n"
+"cloudbuild/sharebuild options: Make sure a cloudbuild or sharebuild is running\n"
+"  -c , --cloudbuild grpc://CLOUDBUILD_SERVICE_IP:PORT\n"      
+"                            Enable cloudbuild mode (remote execution api)\n"
+"  -s , --sharebuild         Enable sharebuild mode (p2p)\n"
+"  -r , --project-root-dir   only valid in cloudbuild or sharebuild mode\n"
 "\n"
 "  -C DIR   change to DIR before doing anything else\n"
 "  -f FILE  specify input build file [default=build.ninja]\n"
@@ -1469,12 +1447,21 @@ int ReadFlags(int* argc, char*** argv,
               Options* options, BuildConfig* config) {
   DeferGuessParallelism deferGuessParallelism(config);
 
-  enum { OPT_VERSION = 1, OPT_QUIET = 2 };
+  enum {   
+      OPT_VERSION = 1,   
+      OPT_QUIET = 2,   
+      OPT_SHAREBUILD = 3,  
+      OPT_CLOUDBUILD = 4,  
+      OPT_PROJECT_ROOT_DIR = 5  
+  };  
   const option kLongOptions[] = {
     { "help", no_argument, NULL, 'h' },
     { "version", no_argument, NULL, OPT_VERSION },
     { "verbose", no_argument, NULL, 'v' },
     { "quiet", no_argument, NULL, OPT_QUIET },
+    { "sharebuild", required_argument, NULL, OPT_SHAREBUILD },  
+    { "cloudbuild", required_argument, NULL, OPT_CLOUDBUILD },  
+    { "project-root-dir", required_argument, NULL, OPT_PROJECT_ROOT_DIR },
     { NULL, 0, NULL, 0 }
   };
 
@@ -1483,21 +1470,24 @@ int ReadFlags(int* argc, char*** argv,
          (opt = getopt_long(*argc, *argv, "s:c:r:d:f:j:k:l:nt:vw:C:h",
                             kLongOptions, NULL)) != -1) {
     switch (opt) {
-      case 's':
-        config->rbe_config_ptr->share_build = true;
-        config->rbe_config_ptr->master_addr = optarg;
-        break;
-      case 'c':
-        config->rbe_config_ptr->cloud_build = true;
-        config->rbe_config_ptr->grpc_url = optarg;
-        if (config->rbe_config_ptr->grpc_url.compare(0, 7, "grpc://") != 0)
-          Fatal("invalid grpc url");
-        break;
-      case 'r': {
-        std::string project_root = optarg;
-        config->rbe_config_ptr->init_proj_config(project_root);
-        break;
-      }
+        case 's':  
+        case OPT_SHAREBUILD:  // -s or --sharebuild  
+            config->share_run = true;   
+            break;  
+        case 'c':  
+        case OPT_CLOUDBUILD:  // -c or --cloudbuild  
+            config->cloud_run = true;  
+            config->rbe_config.grpc_url = optarg;  
+            if (config->rbe_config.grpc_url.compare(0, 7, "grpc://") != 0) {  
+                Fatal("invalid grpc url");  
+            }  
+            break;  
+        case 'r':  
+        case OPT_PROJECT_ROOT_DIR:  // -r or --project-root-dir  
+        {  
+            config->rbe_config.project_root = optarg;   
+            break;  
+        } 
       case 'd':
         if (!DebugEnable(optarg))
           return 1;
@@ -1572,33 +1562,13 @@ int ReadFlags(int* argc, char*** argv,
   *argc -= optind;
 
   return -1;
-}
-
-bool reg(const std::string& ninja_host, const std::string& ninja_dir,
-         const std::string& scheduler_addr, const std::string& root_dir, const std::string& container_image) {
-  RegisterClient registerClient(
-      grpc::CreateChannel(scheduler_addr, grpc::InsecureChannelCredentials()));
-  bool registerSuccess =
-      registerClient.Register(ninja_host, ninja_dir, root_dir, container_image);
-  cout << "注册结果 registerSuccess is " << registerSuccess << endl;
-  return registerSuccess;
-}
-
-bool unReg(const std::string& ninja_host, const std::string& ninja_dir,
-           const std::string& scheduler_addr, const std::string& root_dir) {
-  UnregisterClient unregisterClient(
-      grpc::CreateChannel(scheduler_addr, grpc::InsecureChannelCredentials()));
-  bool unregisterSuccess =
-      unregisterClient.Unregister(ninja_host, ninja_dir, root_dir);
-  cout << "注册结果 unregisterSuccess is " << unregisterSuccess << endl;
-  return unregisterSuccess;
-}
+} 
 
 NORETURN void real_main(int argc, char** argv) {
   // Use exit() instead of return in this function to avoid potentially
   // expensive cleanup when destructing NinjaMain.
   BuildConfig config;
-  config.rbe_config_ptr = &g_rbe_config;
+  load_config_file(config);
   Options options = {};
   options.input_file = "build.ninja";
 
@@ -1622,38 +1592,14 @@ NORETURN void real_main(int argc, char** argv) {
     if (chdir(options.working_dir) < 0) {
       Fatal("chdir to '%s' - %s", options.working_dir, strerror(errno));
     }
-    config.rbe_config_ptr->cwd = options.working_dir;
-  } else if (config.rbe_config_ptr->cloud_build || config.rbe_config_ptr->share_build) { // TODO: 这里的 else if 其实可以删除
-    string err;
-    if (!GetCurrentDirectory(&(config.rbe_config_ptr->cwd), &err)) {
-      Error(err.c_str());
-      exit(1);
+  } 
+  std::string project_root = ".";
+  if (config.cloud_run || config.share_run) {
+    if (!config.rbe_config.project_root.empty()) {
+      project_root = config.rbe_config.project_root;
     }
-    if (config.rbe_config_ptr->project_root.empty())
-      config.rbe_config_ptr->project_root = config.rbe_config_ptr->cwd;
+    load_devcontainer_config(project_root, config);
   }
-
-  if (g_rbe_config.share_build) {
-    Warning("启动 p2p share 分布式编译模式");
-    // 注册ninja
-    bool registerSuccess =
-        reg(g_rbe_config.self_ipv4_address, g_rbe_config.cwd,
-            g_rbe_config.master_addr, g_rbe_config.project_root,
-            g_rbe_config.rbe_properties["container-image"]);
-    if (!registerSuccess) {
-      //注册失败
-      Warning("注册失败");
-      config.rbe_config_ptr->share_build = false; //shut down share build
-    }
-    Warning("sleep(3)");
-    sleep(3);
-  } else if (g_rbe_config.cloud_build) {
-    Info("启动 remote api 分布式编译模式");
-  } else {
-    Info("启动本地编译模式");
-  }
- 
-
 
   #ifndef _WIN32
   SetThreadPoolThreadCount(GetProcessorCount());
@@ -1712,17 +1658,6 @@ NORETURN void real_main(int argc, char** argv) {
     int result = ninja.RunBuild(argc, argv, status);
     if (g_metrics)
       ninja.DumpMetrics();
-
-    if (g_rbe_config.share_build) {
-			Info("注销");
-			// 注销ninja
-			bool unregisterSuccess = unReg(g_rbe_config.self_ipv4_address, g_rbe_config.cwd, g_rbe_config.master_addr, g_rbe_config.project_root);
-
-			if (!unregisterSuccess) {
-				//注销失败
-				Fatal("注销失败");
-			}
-    }
     exit(result);
   }
 
