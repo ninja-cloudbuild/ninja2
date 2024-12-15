@@ -1,5 +1,5 @@
 //
-// Created by ubuntu on 23-5-6.
+//  Copyright 2024 Mengning Software All rights reserved.
 //
 #include <unistd.h>
 #include <memory>
@@ -15,8 +15,12 @@
 
 #include <json/json.h>
 
-RBEConfig g_rbe_config;
+// # /etc/ninja2.conf example
+// cloudbuild: false
+// grpc_url: "grpc://localhost:1985"
+// sharebuild: false
 
+RBEConfig g_rbe_config;
 
 RBEConfig::RBEConfig() {
      self_ipv4_address = get_ipv4_address();
@@ -118,15 +122,14 @@ std::string RBEConfig::get_ipv4_address(size_t address_size) {
 bool RBEConfig::load_server_config(const std::string& filename) {
     try {
         YAML::Node config = YAML::LoadFile(filename);
-        cloud_build = config["cloud_build"].as<bool>(false);
+        cloud_build = config["cloudbuild"].as<bool>(false);
         grpc_url = config["grpc_url"].as<std::string>();
 
-        share_build = config["share_build"].as<bool>(false);
-        master_addr = config["master_addr"].as<std::string>();
-        self_ipv4_address = config["self_ipv4_address"].as<std::string>(get_ipv4_address());
+        share_build = config["sharebuild"].as<bool>(false);
         return true;
     } catch (const std::exception& e) {
-        Warning("exception caught when read conf: %s", e.what());
+        std::cerr << "Error loading config file: " << filename << std::endl;  
+        std::cerr << "Exception caught: " << e.what() << std::endl; 
         return false;
     }
 }
