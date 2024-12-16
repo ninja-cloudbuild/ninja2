@@ -60,6 +60,7 @@ jobs:
         run: |
           chmod +x build.sh
           ./build.sh build
+          ./build.sh package
 
       # 7. 安装构建好的 ninja2
       - name: Install ninja2
