@@ -101,127 +101,127 @@ jobs:
           ./re2_test
           # ctest --output-on-failure
 
-      ## 分布式构建 re2 项目
-      # 13. 启动 scheduler
-      - name: start scheduler
-        run: |
-          # 设置环境变量
-          SCHEDULER_HOST=localhost
-          REDIS_HOST=localhost
-          REDIS_PORT=6379
+      # ## 分布式构建 re2 项目
+      # # 13. 启动 scheduler
+      # - name: start scheduler
+      #   run: |
+      #     # 设置环境变量
+      #     SCHEDULER_HOST=localhost
+      #     REDIS_HOST=localhost
+      #     REDIS_PORT=6379
           
-          # 安装依赖
-          # sudo apt-get update
-          sudo apt-get install -y nfs-kernel-server redis-server
+      #     # 安装依赖
+      #     # sudo apt-get update
+      #     sudo apt-get install -y nfs-kernel-server redis-server
           
-          # 配置并启动 Redis
-          sudo systemctl enable redis-server
-          sudo systemctl restart redis-server
+      #     # 配置并启动 Redis
+      #     sudo systemctl enable redis-server
+      #     sudo systemctl restart redis-server
           
-          # 创建必要的文件夹
-          mkdir -p ~/sharebuild-bin/
-          wget https://github.com/ninja-cloudbuild/ninja2/releases/download/1.12.1.cloud/scheduler
-          chmod +x ./scheduler
-          cp ./scheduler ~/sharebuild-bin
+      #     # 创建必要的文件夹
+      #     mkdir -p ~/sharebuild-bin/
+      #     wget https://github.com/ninja-cloudbuild/ninja2/releases/download/1.12.1.cloud/scheduler
+      #     chmod +x ./scheduler
+      #     cp ./scheduler ~/sharebuild-bin
           
-          # 配置 Scheduler
-          sudo mkdir -p /etc/scheduler
-          cat <<EOF | sudo tee /etc/scheduler/config.yaml > /dev/null
-          redis:
-            host: ${REDIS_HOST}
-            port: ${REDIS_PORT}
-            password: ''
-            db: 0
-          taskServer:
-            port: 8002
-          license:
-            code: ShareBuild1234
-            VerifyService:
-              host: 106.54.183.229
-              port: 8004
-          EOF
+      #     # 配置 Scheduler
+      #     sudo mkdir -p /etc/scheduler
+      #     cat <<EOF | sudo tee /etc/scheduler/config.yaml > /dev/null
+      #     redis:
+      #       host: ${REDIS_HOST}
+      #       port: ${REDIS_PORT}
+      #       password: ''
+      #       db: 0
+      #     taskServer:
+      #       port: 8002
+      #     license:
+      #       code: ShareBuild1234
+      #       VerifyService:
+      #         host: 106.54.183.229
+      #         port: 8004
+      #     EOF
           
-          # 启动 Scheduler
-          # ~/sharebuild-bin/scheduler -config /etc/scheduler/config.yaml &
-          nohup ~/sharebuild-bin/scheduler -config /etc/scheduler/config.yaml > scheduler.log 2>&1 &
+      #     # 启动 Scheduler
+      #     # ~/sharebuild-bin/scheduler -config /etc/scheduler/config.yaml &
+      #     nohup ~/sharebuild-bin/scheduler -config /etc/scheduler/config.yaml > scheduler.log 2>&1 &
 
-      # 14. 启动 executor
-      - name: start executor
-        run: |
-          # 环境变量配置
-          REDIS_HOST=localhost
-          REDIS_PORT=6379
-          SCHEDULER_HOST=localhost
+      # # 14. 启动 executor
+      # - name: start executor
+      #   run: |
+      #     # 环境变量配置
+      #     REDIS_HOST=localhost
+      #     REDIS_PORT=6379
+      #     SCHEDULER_HOST=localhost
 
-          mkdir -p ~/sharebuild-bin
-          wget https://github.com/ninja-cloudbuild/ninja2/releases/download/1.12.1.cloud/executor
-          chmod +x ./executor
-          cp ./executor ~/sharebuild-bin
-
-
-          # 配置 Executor
-          sudo mkdir -p /etc/executor
-          cat <<EOF | sudo tee /etc/executor/config.yaml > /dev/null
-          redis:
-            host: ${REDIS_HOST}
-            port: ${REDIS_PORT}
-            password: ''
-            db: 0
-          taskServer:
-            port: 8003
-            user: $(whoami)
-          schedulerRegisterServer:
-            host: ${SCHEDULER_HOST}
-            port: 8002
-          EOF
-
-          # 启动 Executor
-          # ~/sharebuild-bin/executor -config /etc/executor/config.yaml &     
-          sudo nohup ~/sharebuild-bin/executor -config /etc/executor/config.yaml > executor.log 2>&1 &
-      # 15. ninja2 分布式 sharebuild 模式编译 re2
-      - name: sharebuild re2
-        run: |
-          # 环境变量配置
-          SCHEDULER_HOST=localhost
-
-          # 安装依赖
-          sudo apt-get install -y nfs-kernel-server
-
-          # 配置 NFS
-          echo "/home *(rw,no_root_squash,anonuid=1000,anongid=1000,insecure,async,no_subtree_check)" | sudo tee -a /etc/exports
-          sudo exportfs -a
-          sudo systemctl restart nfs-kernel-server
-
-          # 下载测试项目 re2
-          wget https://github.com/google/re2/archive/refs/tags/2021-11-01.tar.gz
-          tar -zxvf 2021-11-01.tar.gz
-          mv re2-2021-11-01 re2_sharebuild
+      #     mkdir -p ~/sharebuild-bin
+      #     wget https://github.com/ninja-cloudbuild/ninja2/releases/download/1.12.1.cloud/executor
+      #     chmod +x ./executor
+      #     cp ./executor ~/sharebuild-bin
 
 
-          # 分布式测试编译 re2
-          cd re2_sharebuild
-          rm -rf build
-          mkdir -p build
-          cd build
-          cmake -G Ninja ..
-          ninja -s ${SCHEDULER_HOST}:8002 -r "$(realpath ../)"
+      #     # 配置 Executor
+      #     sudo mkdir -p /etc/executor
+      #     cat <<EOF | sudo tee /etc/executor/config.yaml > /dev/null
+      #     redis:
+      #       host: ${REDIS_HOST}
+      #       port: ${REDIS_PORT}
+      #       password: ''
+      #       db: 0
+      #     taskServer:
+      #       port: 8003
+      #       user: $(whoami)
+      #     schedulerRegisterServer:
+      #       host: ${SCHEDULER_HOST}
+      #       port: 8002
+      #     EOF
 
-      # 显示日志文件内容
-      - name: Show executor logs
-        run: cat executor.log
+      #     # 启动 Executor
+      #     # ~/sharebuild-bin/executor -config /etc/executor/config.yaml &     
+      #     sudo nohup ~/sharebuild-bin/executor -config /etc/executor/config.yaml > executor.log 2>&1 &
+      # # 15. ninja2 分布式 sharebuild 模式编译 re2
+      # - name: sharebuild re2
+      #   run: |
+      #     # 环境变量配置
+      #     SCHEDULER_HOST=localhost
 
-      - name: Show scheduler logs
-        run: cat scheduler.log
+      #     # 安装依赖
+      #     sudo apt-get install -y nfs-kernel-server
 
-      # 测试 shabuild 编译出来的 re2 是否正常
-      - name: Test re2(sharebuild)
-        run: |
-          cd re2_sharebuild/build
-          ./re2_test
-          # ctest --output-on-failure
+      #     # 配置 NFS
+      #     echo "/home *(rw,no_root_squash,anonuid=1000,anongid=1000,insecure,async,no_subtree_check)" | sudo tee -a /etc/exports
+      #     sudo exportfs -a
+      #     sudo systemctl restart nfs-kernel-server
+
+      #     # 下载测试项目 re2
+      #     wget https://github.com/google/re2/archive/refs/tags/2021-11-01.tar.gz
+      #     tar -zxvf 2021-11-01.tar.gz
+      #     mv re2-2021-11-01 re2_sharebuild
+
+
+      #     # 分布式测试编译 re2
+      #     cd re2_sharebuild
+      #     rm -rf build
+      #     mkdir -p build
+      #     cd build
+      #     cmake -G Ninja ..
+      #     ninja -s ${SCHEDULER_HOST}:8002 -r "$(realpath ../)"
+
+      # # 显示日志文件内容
+      # - name: Show executor logs
+      #   run: cat executor.log
+
+      # - name: Show scheduler logs
+      #   run: cat scheduler.log
+
+      # # 测试 shabuild 编译出来的 re2 是否正常
+      # - name: Test re2(sharebuild)
+      #   run: |
+      #     cd re2_sharebuild/build
+      #     ./re2_test
+      #     # ctest --output-on-failure
       
       
-      # debug
-      - name: debug network
-        run: | 
-          netstat -tuln | grep 8003
+      # # debug
+      # - name: debug network
+      #   run: | 
+      #     netstat -tuln | grep 8003
