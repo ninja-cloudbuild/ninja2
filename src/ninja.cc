@@ -233,7 +233,8 @@ void Usage(const BuildConfig& config) {
 "  -c , --cloudbuild grpc://CLOUDBUILD_SERVICE_IP:PORT\n"      
 "                            Enable cloudbuild mode (remote execution api)\n"
 "  -s , --sharebuild         Enable sharebuild mode (p2p)\n"
-"  -r , --project-root-dir   only valid in cloudbuild or sharebuild mode\n"
+"  -r , --project-root-dir DIR  The default value for the root directory is \'../\'.\n" 
+"                            Only valid in cloudbuild or sharebuild mode.\n"
 "\n"
 "  -C DIR   change to DIR before doing anything else\n"
 "  -f FILE  specify input build file [default=build.ninja]\n"
@@ -1593,12 +1594,27 @@ NORETURN void real_main(int argc, char** argv) {
       Fatal("chdir to '%s' - %s", options.working_dir, strerror(errno));
     }
   } 
-  std::string project_root = ".";
+  std::string project_root = "../";
   if (config.cloud_run || config.share_run) {
     if (!config.rbe_config.project_root.empty()) {
       project_root = config.rbe_config.project_root;
     }
     load_devcontainer_config(project_root, config);
+    printf("----------------------CloudBuild/ShareBuild Mode Info----------------------\n");
+    if(config.cloud_run){
+      printf("Enabled CloudBuild Mode, Please ensure that %s is running.\n", 
+              config.rbe_config.grpc_url.c_str());
+    }
+    if(config.share_run){
+      printf("Enabled ShareBuild Mode, Please ensure that ShareBuild is running.\n");
+    }
+    if(!config.rbe_config.rbe_properties["container-image"].empty()){
+      printf("The DevContainer is configured. Please ensure that this project can be built in the VS Code DevContainer.\n");
+      printf("The build commands will run romotely in the container image:%s\n", 
+              config.rbe_config.rbe_properties["container-image"].c_str());      
+    }
+    printf("This project root directory is : %s \n", project_root.c_str());
+    printf("---------------------------------------------------------------------------\n");
   }
 
   #ifndef _WIN32
