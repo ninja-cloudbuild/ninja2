@@ -1,4 +1,5 @@
 #!/bin/bash
+# Copyright 2024 Mengning Software All rights reserved.
 
 # Exit immediately if a command exits with a non-zero status
 set -e
@@ -59,23 +60,12 @@ function install_dependencies {
 
 # Function to install the built ninja binary
 function install {
-  if [ ! -f "build/bin/ninja" ]; then
-    failure "Ninja binary not found in build directory. Please build first."
+  if [ ! -f "build/bin/ninja2.tar.gz" ]; then
+    failure "Please build and package first."
     exit 1
   fi
-  
-  local install_path="/usr/bin/ninja"
-  local backup_path="/usr/bin/ninja.prev"
-
-  # Backup existing ninja if it exists
-  if [ -f "$install_path" ]; then
-    sudo mv "$install_path" "$backup_path"
-    success "Backed up original ninja to $backup_path"
-  fi
-
-  # Install new ninja binary
-  sudo cp "build/bin/ninja" "$install_path"
-  success "New ninja installed at $install_path"
+  cp "install.sh" "build/bin/"
+  (cd "build/bin/" && ./install.sh start)
 }
 
 # Function to package the built ninja binary
@@ -86,43 +76,58 @@ function package {
   fi
   
   # package new ninja binary
-  mkdir build/bin/ninja2
+  mkdir -p build/bin/ninja2
   cp "build/bin/ninja" "build/bin/ninja2/"
+
+  cat <<EOL > "build/bin/ninja2/ninja2.conf"
+# Copyright 2024 Mengning Software All rights reserved.  
+# /etc/ninja2.conf example
+
+cloudbuild: false  
+grpc_url: "grpc://localhost:1985"  
+sharebuild: false  
+EOL
+
   (cd build/bin/ && tar -zcvf ninja2.tar.gz ninja2/* && rm -rf ninja2)
   success "New Ninja2 package ninja2.tar.gz at build/bin/"
 }
 
 # Function to install dependencies and build the project
 function build {
-  success "begin build: "
-  install_dependencies
-  clean
-
   # Create build directory and build
   mkdir -p build
-  cd build
-  cmake -G Ninja ..
-  ninja
+  if [ ! -f "build/build.ninja" ]; then
+    (cd build && cmake -G Ninja ..)
+  fi
+  (cd build && ninja)
 
-  success "Build succeeded. Build output is located in $(pwd)"
+  success "Build successfully. Build output is located in build/bin/"
 }
 
 # Main script
 case "$1" in
+  all)
+    install_dependencies
+    clean
+    build
+    package
+    install
+    ;;
   build)
     build
-    ;;
-  clean)
-    clean
-    ;;
-  install)
-    install
     ;;
   package|pkg)
     package
     ;;
+  install)
+    install
+    ;;
+  clean)
+    clean
+    ;;
   *)
-    echo "Usage: $0 {build|clean|install|package}"
+    echo "Usage: $0 {all|build|package|install|clean}"
+    success "Please use ./build.sh all for the first compilation."
     exit 1
     ;;
 esac

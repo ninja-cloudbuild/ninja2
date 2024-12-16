@@ -1,4 +1,5 @@
 #!/bin/bash
+# Copyright 2024 Mengning Software All rights reserved.
 
 # Exit immediately if a command exits with a non-zero status
 set -e
@@ -49,32 +50,49 @@ function install_dependencies {
 
 # Function to install the built ninja binary
 function install {
-  if [ ! -f "ninja2/ninja" ]; then
-    failure "Ninja binary not found."
+  if [ ! -f "ninja2.tar.gz" ]; then
+    failure "ninja2.tar.gz package not found."
     exit 1
   fi
-  
+  tar -zxvf ninja2.tar.gz
   local install_path="/usr/bin/ninja"
   local backup_path="/usr/bin/ninja.prev"
+  local config_file="/etc/ninja2.conf"
+  local backup_config_file="/etc/ninja2.conf.prev"
 
   # Backup existing ninja if it exists
   if [ -f "$install_path" ]; then
     sudo mv "$install_path" "$backup_path"
     success "Backed up original ninja to $backup_path"
   fi
+  # Backup existing /etc/ninja2.conf if it exists
+  if [ -f "$config_file" ]; then
+    sudo mv "$config_file" "$backup_config_file"
+    success "Backed up original $config_file to $backup_config_file"
+  fi
 
   # Install new ninja binary
   sudo cp "ninja2/ninja" "$install_path"
+  sudo cp "ninja2/ninja2.conf" "$config_file"
   success "---------------------------------"
   success "New Ninja2 installed successfully at $install_path"
   success "---------------------------------"
   success "Ninja2 is the second generation of Ninja that supports CloudBuild(Distributed Build System) and Ninja2 is fully compatible with the Ninja."
   success "CloudBuild refer to https://gitee.com/cloudbuild888/cloudbuild"
+  success "Copyright 2024 Mengning Software All rights reserved."
 }
 
 # Main script
-wget -c https://github.com/ninja-cloudbuild/ninja2/releases/download/v2.0.0/ninja2.tar.gz
-tar -zxvf ninja2.tar.gz
-install
-rm -rf ninja2.tar.gz ninja2/ install.sh
+case "$1" in
+  start)
+    install
+    rm -rf ninja2.tar.gz ninja2/ install.sh
+    ;;
+  *)
+    wget -c https://github.com/ninja-cloudbuild/ninja2/releases/download/v2.0.0/ninja2.tar.gz
+    tar -zxvf ninja2.tar.gz
+    install
+    rm -rf ninja2.tar.gz ninja2/ install.sh
+    ;;
+esac
 

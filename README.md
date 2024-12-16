@@ -6,11 +6,27 @@ CloudBuild refer to https://gitee.com/cloudbuild888/cloudbuild
 
 ## QuickStart
 
-### Install the latest prebuild release version
+Install the latest prebuild release version
 
 ```
 wget -c https://raw.githubusercontent.com/ninja-cloudbuild/ninja2/refs/heads/main/install.sh && chmod +x install.sh && sudo ./install.sh
 ```
+
+Enable CloudBuild as default in /etc/ninja2.conf
+
+```
+cloudbuild: true
+grpc_url: "grpc://CLOUDBUILD_SERVICE_IP:PORT"
+```
+
+Enable CloudBuild as once
+
+```
+$ ninja --cloudbuild grpc://CLOUDBUILD_SERVICE_IP:PORT [-r PROJECT_ROOT_DIR]
+```
+- `--cloudbuild` can be used instead of `-c`
+- When the working directory is not the root directory, you should use `-r`, which can replace `--project-root-dir`, 
+
 ### Build & install from source code
 
 ```

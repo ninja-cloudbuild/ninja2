@@ -31,10 +31,8 @@ struct Builder;
 struct DiskInterface;
 struct Edge;
 struct Node;
-struct RBEConfig;
 struct State;
 struct Status;
-
 
 /// Plan stores the state of a build plan: what we intend to build,
 /// which steps we're ready to execute.
@@ -42,7 +40,7 @@ struct Plan {
   Plan(Builder* builder = NULL);
 
   /// Add a target to our plan (including all its dependencies).
-  /// Returns false if we don't need to build this target; mayz
+  /// Returns false if we don't need to build this target; may
   /// fill in |err| with an error message if there's a problem.
   bool AddTarget(const Node* target, std::string* err);
 
@@ -150,7 +148,6 @@ struct CommandRunner {
   virtual size_t CanRunMore() const = 0;
   virtual bool StartCommand(Edge* edge) = 0;
 
-
   /// The result of waiting for a command.
   struct Result {
     Result() : edge(NULL) {}
@@ -165,10 +162,16 @@ struct CommandRunner {
   virtual std::vector<Edge*> GetActiveEdges() { return std::vector<Edge*>(); }
   virtual void Abort() {}
 };
-
+struct ProjectConfig {
+  // project config
+  std::string cwd;                                        // current working directory(i.e. ninjaDir). eg: ~/proj/build
+  std::string project_root;                               // project root directory. eg: ~/proj
+  std::map<std::string, std::string> rbe_properties;      // remote build execution properties
+  std::string grpc_url;
+};
 /// Options (e.g. verbosity, parallelism) passed to a build.
 struct BuildConfig {
-  BuildConfig() : verbosity(NORMAL), dry_run(false), parallelism(1),
+  BuildConfig() : verbosity(NORMAL), dry_run(false), cloud_run(false), share_run(false), parallelism(1),
                   failures_allowed(1), max_load_average(-0.0f) {}
 
   enum Verbosity {
@@ -179,9 +182,9 @@ struct BuildConfig {
   };
   Verbosity verbosity;
   bool dry_run;
-
-  RBEConfig* rbe_config_ptr;
-
+  bool cloud_run;
+  ProjectConfig rbe_config;
+  bool share_run;
   int parallelism;
   int failures_allowed;
   /// The maximum load average we must not exceed. A negative value

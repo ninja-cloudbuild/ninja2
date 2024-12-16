@@ -13,7 +13,6 @@
 #include <thread>
 #include <fstream>
 #include <yaml-cpp/yaml.h>
-#include "../rbe_config.h"
 #include "../util.h"
 
 #include <grpcpp/grpcpp.h>
@@ -47,14 +46,14 @@ void work(ShareThread &ShareThread, string cmd, string cmd_id, string target_str
 }
 
 bool ShareThread::Start(ShareThreadSet* set, const string& command) {
-    std::string target = g_rbe_config.master_addr;
-    std::string ninja_host = g_rbe_config.self_ipv4_address;
-    std::string ninja_dir = g_rbe_config.cwd;
-    set->task_id ++;
-    std::string task_id_str = ninja_host + "_" + to_string(set->task_id);
-    thread t(work, std::ref(*this), command, task_id_str, target, ninja_host, ninja_dir);
-    // std::cout << std::endl << "此时running队列里的任务数为" << set->running_.size() << std::endl;
-    t.detach();
+    // std::string target = g_rbe_config.master_addr;
+    // std::string ninja_host = g_rbe_config.self_ipv4_address;
+    // std::string ninja_dir = g_rbe_config.cwd;
+    // set->task_id ++;
+    // std::string task_id_str = ninja_host + "_" + to_string(set->task_id);
+    // thread t(work, std::ref(*this), command, task_id_str, target, ninja_host, ninja_dir);
+    // // std::cout << std::endl << "此时running队列里的任务数为" << set->running_.size() << std::endl;
+    // t.detach();
     return true;
 }
 
