@@ -1,4 +1,4 @@
-name: ninja2-CI
+name: Test install.sh
 
 on:
   push:
@@ -12,7 +12,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-20.04
 
     steps:
       - name: Install Ninja2
