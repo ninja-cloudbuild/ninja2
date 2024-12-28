@@ -23,6 +23,10 @@ jobs:
         run: |
           ninja --version
 
+      - name: Ninja2 Help
+        run: |
+          ninja --help
+
       - name: Clone re2 repository
         run: |
           wget https://github.com/google/re2/archive/refs/tags/2021-11-01.tar.gz
