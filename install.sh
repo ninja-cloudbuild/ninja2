@@ -28,7 +28,7 @@ function install_dependencies {
   case $OS_ID in
     ubuntu|debian)
       sudo apt-get update
-      sudo apt-get install -y git cmake g++ gcc googletest libgmock-dev libssl-dev pkg-config uuid-dev grpc++ libprotobuf-dev protobuf-compiler-grpc ninja-build libyaml-cpp-dev libprotobuf17  
+      sudo apt-get install -y git cmake g++ gcc googletest libgmock-dev libssl-dev pkg-config uuid-dev grpc++ libprotobuf-dev protobuf-compiler-grpc ninja-build libyaml-cpp-dev
       ;;
     centos)
       sudo yum update -y
