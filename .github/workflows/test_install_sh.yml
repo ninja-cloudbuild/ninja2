@@ -1,47 +1,53 @@
-name: Test install.sh
+name: Test Install Ninja2 and Re2  
 
-on:
-  push:
-    branches:
-      - master
-      - main
-  pull_request:
-    branches:
-      - master
-      - main
+on:  
+  push:  
+    branches:  
+      - master  
+      - main  
+  pull_request:  
+    branches:  
+      - master  
+      - main  
 
-jobs:
-  build:
-    runs-on: ubuntu-20.04
+jobs:  
+  build:  
+    runs-on: ${{ matrix.os }}  
+    strategy:  
+      matrix:  
+        os: [ubuntu-20.04, ubuntu-22.04]  
 
-    steps:
-      - name: Install Ninja2
-        run: |
-          wget -c https://raw.githubusercontent.com/ninja-cloudbuild/ninja2/refs/heads/main/install.sh && chmod +x install.sh && sudo ./install.sh
+    steps:  
+      - name: Checkout repository  
+        uses: actions/checkout@v2  
 
-      - name: Ninja2 Version
-        run: |
-          ninja --version
+      - name: Install Ninja2  
+        run: |  
+          wget -q https://raw.githubusercontent.com/ninja-cloudbuild/ninja2/refs/heads/main/install.sh \
+          && chmod +x install.sh \
+          && sudo ./install.sh  
 
-      - name: Ninja2 Help
-        run: |
-          ninja --help
+      - name: Ninja2 Version  
+        run: ninja --version  
 
-      - name: Clone re2 repository
-        run: |
-          wget https://github.com/google/re2/archive/refs/tags/2021-11-01.tar.gz
-          tar -zxvf 2021-11-01.tar.gz
-          mv re2-2021-11-01 re2
+      - name: Ninja2 Help  
+        run: ninja --help  
 
-      - name: Local Build re2 with ninja2
-        run: |
-          cd re2
-          mkdir -p build
-          cd build
-          cmake -G Ninja ..
-          ninja
+      - name: Clone re2 repository  
+        run: |  
+          wget -q https://github.com/google/re2/archive/refs/tags/2021-11-01.tar.gz \
+          && tar -xzf 2021-11-01.tar.gz \
+          && mv re2-2021-11-01 re2  
 
-      - name: Test re2 build
-        run: |
-          cd re2/build
+      - name: Build re2 with Ninja2  
+        run: |  
+          cd re2  
+          mkdir -p build  
+          cd build  
+          cmake -G Ninja ..  
+          ninja  
+
+      - name: Test re2 build  
+        run: |  
+          cd re2/build  
           ./re2_test
