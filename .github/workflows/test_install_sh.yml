@@ -1,0 +1,43 @@
+name: ninja2-CI
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  pull_request:
+    branches:
+      - master
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Install Ninja2
+        run: |
+          wget -c https://raw.githubusercontent.com/ninja-cloudbuild/ninja2/refs/heads/main/install.sh && chmod +x install.sh && sudo ./install.sh
+
+      - name: Ninja2 Version
+        run: |
+          ninja --version
+
+      - name: Clone re2 repository
+        run: |
+          wget https://github.com/google/re2/archive/refs/tags/2021-11-01.tar.gz
+          tar -zxvf 2021-11-01.tar.gz
+          mv re2-2021-11-01 re2
+
+      - name: Local Build re2 with ninja2
+        run: |
+          cd re2
+          mkdir -p build
+          cd build
+          cmake -G Ninja ..
+          ninja
+
+      - name: Test re2 build
+        run: |
+          cd re2/build
+          ./re2_test
