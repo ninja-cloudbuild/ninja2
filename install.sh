@@ -52,6 +52,7 @@ function install {
     failure "ninja2.tar.gz package not found."
     exit 1
   fi
+  install_dependencies
   tar -zxvf ninja2.tar.gz
   local install_path="/usr/bin/ninja"
   local backup_path="/usr/bin/ninja.prev"
