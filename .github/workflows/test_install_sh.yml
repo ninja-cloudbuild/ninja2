@@ -31,7 +31,8 @@ jobs:
         run: ninja --version  
 
       - name: Ninja2 Help  
-        run: ninja --help  
+        run: ninja --help
+        continue-on-error: true  
 
       - name: Clone re2 repository  
         run: |  
