@@ -28,16 +28,16 @@ function install_dependencies {
   case $OS_ID in
     ubuntu|debian)
       sudo apt-get update
-      sudo apt-get install -y googletest libgmock-dev libssl-dev pkg-config uuid-dev grpc++ libprotobuf-dev protobuf-compiler-grpc libyaml-cpp-dev
+      sudo apt-get install -y googletest libgmock-dev libssl-dev pkg-config uuid-dev grpc++ libprotobuf-dev protobuf-compiler-grpc libyaml-cpp-dev ninja-build
       ;;
     centos)
       sudo yum update -y
       sudo yum install -y epel-release
-      sudo yum install -y gtest gtest-devel openssl openssl-devel pkgconfig uuid-devel grpc-devel protobuf protobuf-devel protobuf-compiler yaml-cpp yaml-cpp-devel
+      sudo yum install -y gtest gtest-devel openssl openssl-devel pkgconfig uuid-devel grpc-devel protobuf protobuf-devel protobuf-compiler yaml-cpp yaml-cpp-devel ninja-build
       ;;
     fedora)
       sudo dnf update -y
-      sudo dnf install -y gtest gtest-devel openssl openssl-devel pkgconfig uuid-devel grpc-devel protobuf protobuf-devel protobuf-compiler yaml-cpp yaml-cpp-devel
+      sudo dnf install -y gtest gtest-devel openssl openssl-devel pkgconfig uuid-devel grpc-devel protobuf protobuf-devel protobuf-compiler yaml-cpp yaml-cpp-devel ninja-build
       ;;
     *)
       failure "Unsupported OS: $OS_ID"
