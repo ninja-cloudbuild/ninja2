@@ -1,60 +1,60 @@
-name: Linux
+name: Linux  
 
-on:
-  pull_request:
-  push:
-  release:
-    types: published
+on:  
+  pull_request:  
+  push:  
+  release:  
+    types: published  
 
-jobs:
-  ubuntu:
-    runs-on: [ubuntu-latest]
-    container:
-      image: ubuntu:20.04
-    steps:
-    - uses: actions/checkout@v4
-    - name: Install dependencies
-      run: sudo apt-get update && sudo apt-get install -y git cmake g++ gcc googletest libgmock-dev libssl-dev pkg-config uuid-dev grpc++ libprotobuf-dev protobuf-compiler-grpc ninja-build libyaml-cpp-dev
+jobs:  
+  ubuntu:  
+    runs-on: [ubuntu-latest]  
+    container:  
+      image: ubuntu:20.04  
+    steps:  
+    - uses: actions/checkout@v4  
+    - name: Install dependencies  
+      run: sudo apt-get update && sudo apt-get install -y git cmake g++ gcc googletest libgmock-dev libssl-dev pkg-config uuid-dev grpc++ libprotobuf-dev protobuf-compiler-grpc ninja-build libyaml-cpp-dev  
     
-    - name: Linting
-      run: misc/ci.py
-      continue-on-error: true 
+    - name: Linting  
+      run: misc/ci.py  
+      continue-on-error: true   
 
-    - name: Build release ninja
-        shell: bash
-        run: |
-          cmake -DCMAKE_BUILD_TYPE=Release -B release-build
-          cmake --build release-build --parallel --config Release
-          strip release-build/bin/ninja
+    - name: Build release ninja  
+      shell: bash  
+      run: |  
+        cmake -DCMAKE_BUILD_TYPE=Release -B release-build  
+        cmake --build release-build --parallel --config Release  
+        strip release-build/bin/ninja  
 
-      - name: Test release ninja
-        run: ./bin/ninja_test
-        working-directory: release-build
+    - name: Test release ninja  
+      run: ./ninja_test
+      working-directory: release-build/bin  
 
-      - name: Create ninja archive
-        run: |
-          ./build.sh build
-          ./build.sh package
-          mkdir -p artifact
-          cp build/bin/ninja2.tar.gz artifact/ninja2.tar.gz
+    - name: Create ninja archive  
+      run: |  
+        ./build.sh build  
+        ./build.sh package  
+        mkdir -p artifact  
+        cp build/bin/ninja2.tar.gz artifact/ninja2.tar.gz  
 
-      # Upload ninja binary archive as an artifact
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ninja-binary-archives
-          path: artifact
+    # Upload ninja binary archive as an artifact  
+    - name: Upload artifact  
+      uses: actions/upload-artifact@v4  
+      with:  
+        name: ninja-binary-archives  
+        path: artifact  
 
-      - name: Upload release asset
-        if: github.event.action == 'published'
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ./artifact/ninja2.tar.gz
-          asset_name: ninja2.tar.gz
-          asset_content_type: application/gzip
+    - name: Upload release asset  
+      if: github.event.action == 'published'  
+      uses: actions/upload-release-asset@v1  
+      env:  
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  
+      with:  
+        upload_url: ${{ github.event.release.upload_url }}  
+        asset_path: ./artifact/ninja2.tar.gz  
+        asset_name: ninja2.tar.gz  
+        asset_content_type: application/gzip
 
   # build:
   #   runs-on: [ubuntu-latest]
