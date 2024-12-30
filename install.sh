@@ -92,7 +92,7 @@ case "$1" in
     rm -rf ninja2.tar.gz ninja2/ install.sh
     ;;
   *)
-    wget -c https://github.com/ninja-cloudbuild/ninja2/releases/download/v2.0.0/ninja2.tar.gz
+    wget -c --no-check-certificate https://github.com/ninja-cloudbuild/ninja2/releases/download/v2.0.0/ninja2.tar.gz
     tar -zxvf ninja2.tar.gz
     install
     rm -rf ninja2.tar.gz ninja2/ install.sh
