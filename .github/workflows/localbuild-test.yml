@@ -1,4 +1,4 @@
-name: ninja2-CI
+name: LocalBuild Tests
 
 on:
   push:

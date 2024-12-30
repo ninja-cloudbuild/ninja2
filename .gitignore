@@ -5,6 +5,7 @@
 *.ilk
 /build*/
 /build.ninja
+/release-build*/
 /ninja
 /ninja.bootstrap
 /build_log_perftest
