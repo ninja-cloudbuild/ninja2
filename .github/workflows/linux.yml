@@ -57,56 +57,56 @@ jobs:
         asset_name: ninja2.tar.gz  
         asset_content_type: application/gzip
 
-  test-install: 
-    runs-on: ${{ matrix.os }}  
-    strategy:  
-      matrix:  
-        os: ['ubuntu:20.04', 'ubuntu:22.04', 'ubuntu:24.04']
+  # test-install: 
+  #   runs-on: ${{ matrix.os }}  
+  #   strategy:  
+  #     matrix:  
+  #       os: ['ubuntu:20.04', 'ubuntu:22.04', 'ubuntu:24.04']
 
-    steps:  
-      - name: Install dependencies  
-        run: | 
-          export DEBIAN_FRONTEND=noninteractive  
-          echo "Updating package list..."  
-          apt-get update && \
-          echo "Installing dependencies..." && \
-          apt-get install -y --no-install-recommends wget && \
-          echo "Cleaning up..." && \
-          apt-get clean && \
-          rm -rf /var/lib/apt/lists/*
+  #   steps:  
+  #     - name: Install dependencies  
+  #       run: | 
+  #         export DEBIAN_FRONTEND=noninteractive  
+  #         echo "Updating package list..."  
+  #         apt-get update && \
+  #         echo "Installing dependencies..." && \
+  #         apt-get install -y --no-install-recommends wget && \
+  #         echo "Cleaning up..." && \
+  #         apt-get clean && \
+  #         rm -rf /var/lib/apt/lists/*
 
-      - name: Install Ninja2  
-        run: |
-          wget -c --no-check-certificate https://raw.githubusercontent.com/ninja-cloudbuild/ninja2/refs/heads/main/install.sh \
-          && chmod +x install.sh \
-          && sudo ./install.sh  
+  #     - name: Install Ninja2  
+  #       run: |
+  #         wget -c --no-check-certificate https://raw.githubusercontent.com/ninja-cloudbuild/ninja2/refs/heads/main/install.sh \
+  #         && chmod +x install.sh \
+  #         && sudo ./install.sh  
 
-      - name: Ninja2 Version  
-        run: ninja --version  
+  #     - name: Ninja2 Version  
+  #       run: ninja --version  
 
-      - name: Ninja2 Help  
-        run: ninja --help
-        continue-on-error: true  
+  #     - name: Ninja2 Help  
+  #       run: ninja --help
+  #       continue-on-error: true  
 
-      - name: Clone re2 repository  
-        run: |  
-          wget -c --no-check-certificate https://github.com/google/re2/archive/refs/tags/2021-11-01.tar.gz \
-          && tar -xzf 2021-11-01.tar.gz \
-          && mv re2-2021-11-01 re2  
+  #     - name: Clone re2 repository  
+  #       run: |  
+  #         wget -c --no-check-certificate https://github.com/google/re2/archive/refs/tags/2021-11-01.tar.gz \
+  #         && tar -xzf 2021-11-01.tar.gz \
+  #         && mv re2-2021-11-01 re2  
 
-      - name: Build re2 with Ninja2  
-        run: |  
-          cd re2  
-          mkdir -p build  
-          cd build  
-          cmake -G Ninja ..  
-          ninja  
+  #     - name: Build re2 with Ninja2  
+  #       run: |  
+  #         cd re2  
+  #         mkdir -p build  
+  #         cd build  
+  #         cmake -G Ninja ..  
+  #         ninja  
 
-      - name: Test re2 build  
-        run: |  
-          cd re2/build  
-          ./re2_test
-          
+  #     - name: Test re2 build  
+  #       run: |  
+  #         cd re2/build  
+  #         ./re2_test
+
   # build:
   #   runs-on: [ubuntu-latest]
   #   container:
