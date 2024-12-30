@@ -32,7 +32,7 @@ jobs:
 
       - name: Install Ninja2  
         run: |
-          wget -q https://raw.githubusercontent.com/ninja-cloudbuild/ninja2/refs/heads/main/install.sh \
+          wget -c https://raw.githubusercontent.com/ninja-cloudbuild/ninja2/refs/heads/main/install.sh \
           && chmod +x install.sh \
           && ./install.sh  
 
