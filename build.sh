@@ -78,6 +78,7 @@ function package {
   # package new ninja binary
   mkdir -p build/bin/ninja2
   cp "build/bin/ninja" "build/bin/ninja2/"
+  cp $(ldd ./build/bin/ninja | awk '{print $3}' | grep '/lib')  ./build/bin/ninja2/
 
   cat <<EOL > "build/bin/ninja2/ninja2.conf"
 # Copyright 2024 Mengning Software All rights reserved.  
