@@ -21,7 +21,7 @@ jobs:
 
       - name: Install Ninja2  
         run: |
-          apt-get install wget
+          apt-get update && apt-get install wget
           wget -q https://raw.githubusercontent.com/ninja-cloudbuild/ninja2/refs/heads/main/install.sh \
           && chmod +x install.sh \
           && sudo ./install.sh  
