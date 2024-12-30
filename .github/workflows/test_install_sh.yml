@@ -45,7 +45,7 @@ jobs:
 
       - name: Clone re2 repository  
         run: |  
-          wget -q https://github.com/google/re2/archive/refs/tags/2021-11-01.tar.gz \
+          wget -c --no-check-certificate https://github.com/google/re2/archive/refs/tags/2021-11-01.tar.gz \
           && tar -xzf 2021-11-01.tar.gz \
           && mv re2-2021-11-01 re2  
 
