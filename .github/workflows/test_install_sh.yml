@@ -8,15 +8,12 @@ on:
 
 jobs:  
   build: 
-    runs-on: ${{ matrix.image }}
-    strategy:
-      matrix:
-        image: ['ubuntu:20.04', 'ubuntu:22.04', 'ubuntu:24.04']
+    runs-on: ${{ matrix.os }}  
+    strategy:  
+      matrix:  
+        os: ['ubuntu:20.04', 'ubuntu:22.04', 'ubuntu:24.04']
 
     steps:  
-      - name: Checkout repository  
-        uses: actions/checkout@v2
-
       - name: Install dependencies  
         run: | 
           export DEBIAN_FRONTEND=noninteractive  
@@ -32,7 +29,7 @@ jobs:
         run: |
           wget -c --no-check-certificate https://raw.githubusercontent.com/ninja-cloudbuild/ninja2/refs/heads/main/install.sh \
           && chmod +x install.sh \
-          && ./install.sh  
+          && sudo ./install.sh  
 
       - name: Ninja2 Version  
         run: ninja --version  
