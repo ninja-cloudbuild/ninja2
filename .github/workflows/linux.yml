@@ -23,25 +23,18 @@ jobs:
         echo "Cleaning up..." && \
         apt-get clean && \
         rm -rf /var/lib/apt/lists/*
-        
-    - name: Linting  
-      run: misc/ci.py  
-      continue-on-error: true   
 
-    - name: Build release ninja  
-      shell: bash  
+    - name: Build ninja  
       run: |  
-        cmake -DCMAKE_BUILD_TYPE=Release -B release-build  
-        cmake --build release-build --parallel --config Release  
-        strip release-build/bin/ninja  
+        ./build.sh build
+        strip build/bin/ninja  
 
-    - name: Test release ninja  
+    - name: Test ninja  
       run: ./ninja_test
-      working-directory: release-build/bin  
+      working-directory: build/bin  
 
     - name: Create ninja archive  
       run: |  
-        ./build.sh build  
         ./build.sh package  
         mkdir -p artifact  
         cp build/bin/ninja2.tar.gz artifact/ninja2.tar.gz  
