@@ -1,21 +1,19 @@
 name: Test Install Ninja2 and Re2  
 
 on:  
-  push:  
-    branches:  
-      - master  
-      - main  
   pull_request:  
-    branches:  
-      - master  
-      - main  
+  push:  
+  release:  
+    types: published  
 
 jobs:  
   build:  
-    runs-on: ${{ matrix.os }}  
-    strategy:  
-      matrix:  
-        os: ['ubuntu:20.04', 'ubuntu:22.04', 'ubuntu:24.04']
+    runs-on: [ubuntu-latest]
+    container:
+      image: ${{ matrix.image }}
+    strategy:
+      matrix:
+        image: ['ubuntu:20.04', 'ubuntu:22.04', 'ubuntu:24.04']
 
     steps:  
       - name: Checkout repository  
