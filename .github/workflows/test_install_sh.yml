@@ -20,7 +20,8 @@ jobs:
         uses: actions/checkout@v2  
 
       - name: Install Ninja2  
-        run: |  
+        run: |
+          apt-get install wget
           wget -q https://raw.githubusercontent.com/ninja-cloudbuild/ninja2/refs/heads/main/install.sh \
           && chmod +x install.sh \
           && sudo ./install.sh  
