@@ -34,7 +34,7 @@ jobs:
         run: |
           wget -q https://raw.githubusercontent.com/ninja-cloudbuild/ninja2/refs/heads/main/install.sh \
           && chmod +x install.sh \
-          && sudo ./install.sh  
+          && ./install.sh  
 
       - name: Ninja2 Version  
         run: ninja --version  
