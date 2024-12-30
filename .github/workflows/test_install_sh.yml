@@ -17,11 +17,21 @@ jobs:
 
     steps:  
       - name: Checkout repository  
-        uses: actions/checkout@v2  
+        uses: actions/checkout@v2
+
+      - name: Install dependencies  
+        run: | 
+          export DEBIAN_FRONTEND=noninteractive  
+          echo "Updating package list..."  
+          apt-get update && \
+          echo "Installing dependencies..." && \
+          apt-get install -y --no-install-recommends wget && \
+          echo "Cleaning up..." && \
+          apt-get clean && \
+          rm -rf /var/lib/apt/lists/*
 
       - name: Install Ninja2  
         run: |
-          apt-get update && apt-get install wget
           wget -q https://raw.githubusercontent.com/ninja-cloudbuild/ninja2/refs/heads/main/install.sh \
           && chmod +x install.sh \
           && sudo ./install.sh  
