@@ -78,7 +78,8 @@ function package {
   # package new ninja binary
   mkdir -p build/bin/ninja2
   cp "build/bin/ninja" "build/bin/ninja2/"
-  cp $(ldd ./build/bin/ninja | awk '{print $3}' | grep '/lib')  ./build/bin/ninja2/
+  # 在Ubuntu22.04中缺失的so文件
+  cp $(ldd ./build/bin/ninja | awk '{print $3}' | grep -E 'libcares\.so\.2|libssl\.so\.1\.1|libprotobuf\.so\.17|libcrypto\.so\.1\.1|libgrpc\+\+.so\.1|libyaml\-cpp\.so\.0\.6|libgrpc\.so\.6')  ./build/bin/ninja2/
 
   cat <<EOL > "build/bin/ninja2/ninja2.conf"
 # Copyright 2024 Mengning Software All rights reserved.  
