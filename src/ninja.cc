@@ -1596,6 +1596,11 @@ NORETURN void real_main(int argc, char** argv) {
   } 
   std::string project_root = "../";
   if (config.cloud_run || config.share_run) {
+     string err;
+    if (!GetCurrentDirectory(&config.rbe_config.cwd, &err)) {
+      Error(err.c_str());
+      exit(1);
+    }
     if (!config.rbe_config.project_root.empty()) {
       project_root = config.rbe_config.project_root;
     }
