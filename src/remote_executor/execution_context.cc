@@ -80,6 +80,19 @@ FileNode File::ToFileNode(const std::string& name) const {
   return result;
 }
 
+OutputFile File::ToOutputFile(const std::string& path) const {
+  OutputFile result;
+  result.set_path(path);
+  *result.mutable_digest() = digest;
+  result.set_is_executable(executable);
+  if (mtime_set) {
+    auto node_properties = result.mutable_node_properties();
+    node_properties->mutable_mtime()->CopyFrom(MakeTimestamp(mtime));
+  }
+  return result;
+}
+
+
 void NestedDirectory::Add(const File& file, const char* relative_path) {
   const char *slash = strchr(relative_path, '/');
   if (slash) {
@@ -265,7 +278,7 @@ bool BuildActionOutputs(RemoteSpawn* spawn, const std::string& cwd,
     std::string merklePath(product);
     if (merklePath[0] == '/' &&
         !StaticFileUtils::HasPathPrefix(merklePath,
-                                        RemoteSpawn::config->project_root)) {
+                                        RemoteSpawn::config->rbe_config.project_root)) {
       continue;
     }
     char currentPath[PATH_MAX];
@@ -276,13 +289,12 @@ bool BuildActionOutputs(RemoteSpawn* spawn, const std::string& cwd,
       // return false;
        char target[PATH_MAX];
        ssize_t len=readlink(currentPath,target,sizeof(target)-1);
-       string real_target;
+       std::string real_target;
        if(len==-1){
           Error("Error read symbol link %s",product.c_str());
        }else{
          target[len] = '\0';
          real_target=target;
-         cout<<real_target;
        }
        OutputSymlink outsymlink;
        outsymlink.set_path(product);
@@ -298,7 +310,7 @@ bool BuildActionOutputs(RemoteSpawn* spawn, const std::string& cwd,
   }
   
   const auto cmd_proto = GenerateCommandProto(spawn->arguments, products,
-                                                 cmd_work_dir);
+                                                 cmd_work_dir,spawn->config->rbe_config.rbe_properties);
   const auto cmd_digest = MakeDigest(cmd_proto);
   (*blobs)[cmd_digest] = cmd_proto.SerializeAsString();
 
@@ -375,10 +387,8 @@ void ExecutionContext::Execute(int fd, RemoteExecutor::RemoteSpawn* spawn,
   // spawn->work.remote = false;
   if (!cached && !spawn->can_remote) {
     // Execute locally
-     EdgeCommand c;
-     spawn->edge->EvaluateCommand(&c);
     SubprocessSet subprocset;
-    Subprocess* subproc = subprocset.Add(c);
+    Subprocess* subproc = subprocset.Add(spawn->command);
     if (!subproc) {
       Fatal("Error while `Execute locally and Update to ActionCache`"); 
     }    

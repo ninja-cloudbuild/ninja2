@@ -61,6 +61,8 @@ struct StaticFileUtils {
   static bool IsExecutable(const char* path);
   static bool IsExecutable(int fd);
 
+  static bool IsSymlink(const char* path);
+
   static std::chrono::system_clock::time_point GetFileMtime(const char* path);
   static std::chrono::system_clock::time_point GetFileMtime(const int fd);
 
