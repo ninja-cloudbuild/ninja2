@@ -169,6 +169,12 @@ bool StaticFileUtils::IsExecutable(int fd) {
   return false;
 }
 
+bool StaticFileUtils::IsSymlink(const char* path){
+  struct stat statResult;
+  lstat(path,&statResult);
+  return S_ISLNK(statResult.st_mode); 
+} 
+
 struct stat StaticFileUtils::GetFileStat(int dirfd, const char* path) {
   struct stat statResult;
   if (fstatat(dirfd, path, &statResult, 0) != 0)

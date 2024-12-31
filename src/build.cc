@@ -814,9 +814,29 @@ size_t CloudCommandRunner::CanRunMore() const {
   return capacity;
 }
 
+
 bool CloudCommandRunner::StartCommand(Edge* edge) {
   string command = edge->EvaluateCommand();
   auto spawn = RemoteExecutor::RemoteSpawn::CreateRemoteSpawn(edge);
+  string cmd_rule =spawn->edge->rule().name();
+  if(config_.rbe_config.local_only_rules.find(cmd_rule) != config_.rbe_config.local_only_rules.end()){
+    SubprocessSet subprocset;
+    Subprocess* subproc = subprocset.Add(spawn->command,edge->use_console());
+    if (!subproc) {
+      return false;
+    }   
+    return true;
+  }
+  for(auto &cmd:config_.rbe_config.fuzzy_rules){
+    if(cmd.find(cmd_rule)!=std::string::npos){
+    SubprocessSet subprocset;
+    Subprocess* subproc = subprocset.Add(spawn->command,edge->use_console());
+    if (!subproc) {
+      return false;
+    }   
+    return true;
+    }
+  }
   RemoteProcess* remoteproc = remote_procs_.Add(spawn);
   if (!remoteproc)
     return false;

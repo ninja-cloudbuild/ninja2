@@ -80,6 +80,19 @@ FileNode File::ToFileNode(const std::string& name) const {
   return result;
 }
 
+OutputFile File::ToOutputFile(const std::string& path) const {
+  OutputFile result;
+  result.set_path(path);
+  *result.mutable_digest() = digest;
+  result.set_is_executable(executable);
+  if (mtime_set) {
+    auto node_properties = result.mutable_node_properties();
+    node_properties->mutable_mtime()->CopyFrom(MakeTimestamp(mtime));
+  }
+  return result;
+}
+
+
 void NestedDirectory::Add(const File& file, const char* relative_path) {
   const char *slash = strchr(relative_path, '/');
   if (slash) {
@@ -243,45 +256,66 @@ Action BuildAction(RemoteSpawn* spawn, const std::string& cwd,
   return action;
 }
 
-void BuildActionOutputs(RemoteSpawn* spawn, const std::string& cwd,
+bool BuildActionOutputs(RemoteSpawn* spawn, const std::string& cwd,
     DigestStringMap* blobs, DigestStringMap* digest_files,
     ActionResult *result) {
+  std::set<std::string> products;
   std::set<std::string> deps;
   for (auto i : spawn->outputs)
+    products.insert(i);
+   for (auto i : spawn->inputs)
     deps.insert(i);
-
-  NestedDirectory nested_dir;
-  auto cmd_work_dir = CommonAncestorPath(deps, deps, cwd);
+  //NestedDirectory nested_dir;
+  auto cmd_work_dir = CommonAncestorPath(deps, products, cwd);
   // BuildMerkleTree(deps, cmd_work_dir, &nested_dir, digest_files);
-  for (auto& dep : deps) {
-    std::string merklePath(dep);
-    if (merklePath[0] != '/' && !cwd.empty())
-      merklePath = cwd + "/" + merklePath;
-    merklePath = StaticFileUtils::NormalizePath(merklePath.c_str());
-    if (merklePath[0] == '/' &&
-        !StaticFileUtils::HasPathPrefix(merklePath,
-            RemoteSpawn::config->rbe_config.project_root)) {
+  //file exist?
+  // if(!StaticFileUtils::WaitForPipeClose(spawn->local_pipe_fd_))
+  //     Fatal("local output produce failed!");
+  for (auto& product : products) {
+    if(product.find(".o.d")!=std::string::npos){
       continue;
     }
-    File file(dep.c_str());
-    nested_dir.Add(file, merklePath.c_str());
-    (*digest_files)[file.digest] = dep;
-    OutputFile output;
-    output.mutable_digest()->CopyFrom(file.digest);
-    output.set_path(merklePath.c_str());
-    *result->add_output_files() = output;
+    std::string merklePath(product);
+    if (merklePath[0] == '/' &&
+        !StaticFileUtils::HasPathPrefix(merklePath,
+                                        RemoteSpawn::config->rbe_config.project_root)) {
+      continue;
+    }
+    char currentPath[PATH_MAX];
+    getcwd(currentPath, sizeof(currentPath));
+    strcat(currentPath,"/");
+    strcat(currentPath,product.c_str());
+    if(StaticFileUtils::IsSymlink(currentPath)){
+      // return false;
+       char target[PATH_MAX];
+       ssize_t len=readlink(currentPath,target,sizeof(target)-1);
+       std::string real_target;
+       if(len==-1){
+          Error("Error read symbol link %s",product.c_str());
+       }else{
+         target[len] = '\0';
+         real_target=target;
+       }
+       OutputSymlink outsymlink;
+       outsymlink.set_path(product);
+       outsymlink.set_target(real_target);
+       result->add_output_symlinks()->CopyFrom(outsymlink);
+    }else{
+      File file(product.c_str());
+     (*digest_files)[file.digest] = product;
+   
+      auto  outputF=file.ToOutputFile(std::string(merklePath.c_str()));
+      result->add_output_files()->CopyFrom(outputF);
+    }
   }
-  if (!cmd_work_dir.empty()) {
-    cmd_work_dir = StaticFileUtils::NormalizePath(cmd_work_dir.c_str());
-    nested_dir.AddDirectory(cmd_work_dir.c_str());
-  }
-  const auto dir_digest = nested_dir.ToDigest(blobs);
-  const auto cmd_proto = GenerateCommandProto(spawn->arguments, deps, cmd_work_dir, 
-                                              spawn->config->rbe_config.rbe_properties);
+  
+  const auto cmd_proto = GenerateCommandProto(spawn->arguments, products,
+                                                 cmd_work_dir,spawn->config->rbe_config.rbe_properties);
   const auto cmd_digest = MakeDigest(cmd_proto);
   (*blobs)[cmd_digest] = cmd_proto.SerializeAsString();
 
-  return ;
+  result->set_exit_code(0);
+  return true;
 }
 
 constexpr auto kMetadataToolName = "Ninja_Remote";
@@ -341,6 +375,9 @@ void ExecutionContext::Execute(int fd, RemoteExecutor::RemoteSpawn* spawn,
   bool cached = false;
   ActionResult result;
   cached = re_client.FetchFromActionCache(action_digest, products, &result);
+   Warning("Execute locally CMD: %s,is it cached? %d", spawn->command.c_str(),cached);
+  if(cached) 
+    exit_code = result.exit_code();
   // Info("action cached is %d", cached);
 
   // 本地和远程共享一套 cache
@@ -353,8 +390,7 @@ void ExecutionContext::Execute(int fd, RemoteExecutor::RemoteSpawn* spawn,
     SubprocessSet subprocset;
     Subprocess* subproc = subprocset.Add(spawn->command);
     if (!subproc) {
-      Warning("Error while `Execute locally and Update to ActionCache`"); 
-      return;
+      Fatal("Error while `Execute locally and Update to ActionCache`"); 
     }    
     //wait for local run finished
     subproc = NULL;
@@ -369,7 +405,12 @@ void ExecutionContext::Execute(int fd, RemoteExecutor::RemoteSpawn* spawn,
     delete subproc;
 
     DigestStringMap outblobs, outputs_digest_files;
-    BuildActionOutputs(spawn, cwd, &outblobs, &outputs_digest_files, &result);
+     bool ret = BuildActionOutputs(spawn, cwd, &outblobs, &outputs_digest_files, &result);
+      if(!ret){
+        exit_code = 0;
+        close(fd);
+        return;
+      }
     outblobs[action_digest] = action.SerializeAsString();
     try {
       // 上传文件至 CAS cache
@@ -399,6 +440,10 @@ void ExecutionContext::Execute(int fd, RemoteExecutor::RemoteSpawn* spawn,
 
   const int _exit_code = result.exit_code();
   exit_code = _exit_code;
+    if ( exit_code != 0) {
+        close(fd);
+        return;
+      }
   if (_exit_code == 0 && result.output_files_size() == 0 && products.size() != 0)
     Fatal("Action produced none of the of the expected output_files");
 

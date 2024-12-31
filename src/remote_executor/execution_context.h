@@ -37,6 +37,7 @@ struct File {
        const std::vector<std::string>& capture_properties = {});
 
   FileNode ToFileNode(const std::string &name) const;
+  OutputFile ToOutputFile(const std::string &name) const;
 
 private:
   void Init(int fd, const FileDigestFunction& digest_func,
