@@ -168,6 +168,9 @@ struct ProjectConfig {
   std::string project_root;                               // project root directory. eg: ~/proj
   std::map<std::string, std::string> rbe_properties;      // remote build execution properties
   std::string grpc_url;
+  std::set<std::string>  local_only_rules;
+  std::set<std::string>  remote_no_cache_rules;
+  std::set<std::string>  fuzzy_rules;
 };
 /// Options (e.g. verbosity, parallelism) passed to a build.
 struct BuildConfig {

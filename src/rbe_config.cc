@@ -10,6 +10,7 @@
 #include <yaml-cpp/yaml.h>
 #include <json/json.h>
 #include "rbe_config.h"
+#include <filesystem>
 
 bool load_config_file(BuildConfig &config) {
   std::string config_file = "/etc/ninja2.conf";
@@ -65,3 +66,35 @@ void load_devcontainer_config(const std::string& project_root, BuildConfig &conf
         config.rbe_config.rbe_properties["workload-isolation-type"] = "docker";  
     }  
 } 
+
+const std::string COMMANDFILE ="/command_cloudbuild.yml";
+
+void load_command_file(const std::string& project_root, BuildConfig &config){
+   std::string commandFilePath=project_root+COMMANDFILE;
+    std::ifstream file(commandFilePath);  
+    YAML::Node  command_set;
+    if (file.is_open()){
+      command_set = YAML::LoadFile(commandFilePath);
+        } else {
+            std::cout << "YAML file not found,no filter command.\n";
+            return;
+        }
+     if (command_set) {
+        if (command_set["commands"]["local_only"]) {
+            for (const auto& cmd : command_set["commands"]["local_only"]) {
+                config.rbe_config.local_only_rules.insert(cmd.as<std::string>());
+            }
+        }
+        if (command_set["commands"]["remote_no_cache"]) {
+            for (const auto& cmd : command_set["commands"]["remote_no_cache"]) {
+                 config.rbe_config.remote_no_cache_rules.insert(cmd.as<std::string>());
+            }
+        }
+         if (command_set["commands"]["fuzzy_rule"]) {
+            for (const auto& cmd : command_set["commands"]["fuzzy_rule"]) {
+                 config.rbe_config.fuzzy_rules.insert(cmd.as<std::string>());
+            }
+        }
+
+    }
+}
