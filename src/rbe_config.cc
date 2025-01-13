@@ -12,20 +12,36 @@
 #include "rbe_config.h"
 #include <filesystem>
 
+
+// #include <sstream>
+#include <stdexcept>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <ifaddrs.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+
+// 获取当前主机 ipv4 地址
+std::string get_ipv4_address(size_t address_size);
+
 bool load_config_file(BuildConfig &config) {
   std::string config_file = "/etc/ninja2.conf";
     try {
         YAML::Node ninja2_conf = YAML::LoadFile(config_file);
+        
         config.cloud_run = ninja2_conf["cloudbuild"].as<bool>(false);
-        if(config.cloud_run && ninja2_conf["grpc_url"]){
+        if (config.cloud_run && ninja2_conf["grpc_url"]) {
           config.rbe_config.grpc_url = ninja2_conf["grpc_url"].as<std::string>("");
           if (config.rbe_config.grpc_url.compare(0, 7, "grpc://") != 0) {  
                 Fatal("invalid grpc url in /etc/ninja2.conf");  
-          }  
-        }else{
-          config.cloud_run = false;
-          config.share_run = ninja2_conf["sharebuild"].as<bool>(false);
+          }
         }
+        
+        config.share_run = ninja2_conf["sharebuild"].as<bool>(false);
+        // zero config: `localhost:50051` as default sharebuild proxy address
+        config.rbe_config.shareproxy_addr = ninja2_conf["shareproxy_addr"].as<std::string>("localhost:50051");
+        config.rbe_config.self_ipv4_addr = ninja2_conf["self_ipv4_addr"].as<std::string>(get_ipv4_address(INET_ADDRSTRLEN));
         return true;
     } catch (const std::exception& e) {
         std::cerr << "Error loading config file: " << config_file << std::endl;  
@@ -97,4 +113,67 @@ void load_command_file(const std::string& project_root, BuildConfig &config){
         }
 
     }
+}
+
+std::string execute_command(const char* cmd) {
+    std::array<char, 128> buffer;
+    std::string result;
+    std::unique_ptr<FILE, decltype(&pclose)> pipe(popen(cmd, "r"), pclose);
+    if (!pipe) {
+        throw std::runtime_error("popen() failed!");
+    }
+    while (fgets(buffer.data(), buffer.size(), pipe.get()) != nullptr) {
+        result += buffer.data();
+    }
+    return result;
+}
+
+std::string get_ipv4_address(size_t address_size) {
+    char address[INET_ADDRSTRLEN];
+    struct ifaddrs* ifaddr;
+    struct ifaddrs* ifa;
+    struct sockaddr_in* addr;
+
+    // 获取本地网络接口地址信息列表
+    if (getifaddrs(&ifaddr) == -1) {
+        perror("getifaddrs");
+        exit(EXIT_FAILURE);
+    }
+
+    // 遍历网络接口地址信息列表，查找IPv4地址
+    for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
+        if (ifa->ifa_addr == NULL) {
+            continue;
+        }
+
+        // 判断是否为IPv4地址
+        if (ifa->ifa_addr->sa_family == AF_INET) {
+            addr = (struct sockaddr_in*)ifa->ifa_addr;
+            // 排除回环地址
+            if (!strcmp(inet_ntoa(addr->sin_addr), "127.0.0.1")) {
+                continue;
+            }
+            // 将IPv4地址拷贝到目标缓冲区
+            strncpy(address, inet_ntoa(addr->sin_addr), address_size - 1);
+            address[address_size - 1] = '\0';
+            break;
+        }
+    }
+
+    // 释放网络接口地址信息列表
+    freeifaddrs(ifaddr);
+
+    // 如果通过网络接口没有找到有效 IP 地址，尝试通过命令获取
+    if (strlen(address) == 0) {
+        std::cout << "Failed to obtain IP address via network interface, trying command..." << std::endl;
+        try {
+            std::string command_result = execute_command("hostname -I");
+            std::istringstream iss(command_result);
+            iss >> address;  // 获取第一个非回环 IP 地址
+        } catch (const std::runtime_error& e) {
+            std::cerr << "Failed to obtain IP address via command: " << e.what() << std::endl;
+            return "";
+        }
+    }
+    return std::string(address);
 }

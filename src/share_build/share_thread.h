@@ -12,6 +12,7 @@
 #include <sys/resource.h>
 #include "../graph.h"
 #include "../exit_status.h"
+#include "../rbe_config.h"
 using namespace std;
 
 struct ShareThread {
@@ -26,7 +27,7 @@ public:
     const struct rusage* GetUsage() const;
     string result_output;
 private:
-    ShareThread(bool use_console);
+    ShareThread(bool use_console, const ProjectConfig& config);
     bool Start(struct ShareThreadSet* set, const std::string& command);
     void OnPipeReady();
 
@@ -39,13 +40,15 @@ private:
     bool use_console_;
 
     friend struct ShareThreadSet;
+
+    const ProjectConfig& rbe_config_;
 };
 
 struct ShareThreadSet {
     ShareThreadSet();
     ~ShareThreadSet();
 
-    ShareThread* Add(const EdgeCommand& cmd);
+    ShareThread* Add(const EdgeCommand& cmd, const ProjectConfig& config);
     bool DoWork();
     ShareThread* NextFinished();
     void Clear();

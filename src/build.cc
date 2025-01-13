@@ -665,7 +665,7 @@ size_t ShareCommandRunner::CanRunMore() const {
 bool ShareCommandRunner::StartCommand(Edge* edge) {
   EdgeCommand c;
   c.command = edge->EvaluateCommand();
-  ShareThread* share_thread = share_threads_.Add(c);
+  ShareThread* share_thread = share_threads_.Add(c, config_.rbe_config);
   if (!share_thread)
     return false;
   thread_to_edge_.insert(make_pair(share_thread, edge));

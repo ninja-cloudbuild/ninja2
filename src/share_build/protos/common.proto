@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package api;
+
+option go_package = "./api";
+
+message Peer {
+  string id = 1;
+  string ip = 2;
+  int32 port = 3;
+}
+
+message Project {
+  string ninja_host = 1; // ninja2 所在机器的ip
+  string ninja_dir = 2;  // ninja2 的 build 工作目录
+  string root_dir = 3;   // ninja2 的项目主目录
+}
+
+// 通用的返回 Status 
+message Status {
+  RC code = 1;
+  string message = 2;
+}
+
+enum RC {
+  RC_UNKNOWN = 0; // 默认未知状态码
+
+  // =========== Proxy 模块的状态码 ===========
+  PROXY_OK = 1000;              // Proxy 操作成功
+  PROXY_INVALID_REQUEST = 1001; // 无效请求
+  PROXY_TIMEOUT = 1002;         // Proxy 超时
+  PROXY_INTERNAL_ERROR = 1003;     // Proxy 内部错误
+  PROXY_KVSTORE_FAILED = 1004;     // KVStore 操作失败
+  PROXY_NO_AVAILABLE_EXECUTOR = 1005; // 没有可用的 Executor
+  PROXY_ALL_EXECUTOR_FAILED = 1030; // 所有 Executor 都执行失败
+
+
+  // =========== Executor 模块的状态码 ===========
+  EXECUTOR_OK = 2000;                     // 操作成功
+  EXECUTOR_RESOURCE_NOT_FOUND = 2001;    // 资源未找到
+  EXECUTOR_TASK_FAILED = 2002;           // 任务执行失败
+  EXECUTOR_INTERNAL_ERROR = 2003;        // 内部错误
+  EXECUTOR_INVALID_ARGUMENT = 2004;      // 参数错误
+  EXECUTOR_TASK_ALREADY_CLAIMED = 2005;  // 任务已被领取
+  EXECUTOR_UNEXPECTED_RESULT = 2006;     // 非预期结果
+  EXECUTOR_RESOURCE_CREATION_FAILED = 2007; // 资源创建失败（如 KVStore 客户端）
+  EXECUTOR_ENV_PREPARE_FAILED = 2008;       // 环境准备失败
+  EXECUTOR_RUNNER_CREATION_FAILED = 2009;   // Runner 创建失败（如 ProjectRunner）
+}
+

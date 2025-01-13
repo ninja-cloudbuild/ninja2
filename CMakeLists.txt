@@ -162,10 +162,8 @@ add_library(libninja OBJECT
 	src/version.cc
 
 
-	src/share_build/execute1Service.cc
-	src/share_build/ninjaRegisterService.cc
-	src/share_build/ninjaUnregisterService.cc
 	src/share_build/share_thread.cc
+	src/share_build/proxy_service_client.cc
 )
 
 find_package(yaml-cpp REQUIRED)#找到package

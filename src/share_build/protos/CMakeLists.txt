@@ -16,9 +16,8 @@ set(PROTO_GEN_DIR ${CMAKE_CURRENT_BINARY_DIR})
 set(PROTO_SOURCE_DIR .)
 
 set(PROTOS
-    execute1
-    ninjaRegister
-    ninjaUnregister
+    common
+    proxy
 )
 set(PROTO_GENERATED_SRCS "")
 

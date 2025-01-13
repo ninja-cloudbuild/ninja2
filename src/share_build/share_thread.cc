@@ -16,17 +16,18 @@
 #include "../util.h"
 
 #include <grpcpp/grpcpp.h>
-#include "execute1.grpc.pb.h"
-#include "execute1Service.h"
+#include "proxy.grpc.pb.h"
+#include "common.pb.h"
+#include "proxy_service_client.h"
+#include "sharebuild.h"
+
 
 extern char** environ;
-using execute1::ExecuteRequest;
-using execute1::ExecuteResult;
-using execute1::ExecuteService;
 
-ShareThread::ShareThread(bool use_console) : fd_(-1), pid_(-1),
-                                           use_console_(use_console) {
-}
+
+ShareThread::ShareThread(bool use_console, const ProjectConfig& config)
+    : fd_(-1), pid_(-1), use_console_(use_console), rbe_config_(config) {}
+    
 
 ShareThread::~ShareThread() {
     if (fd_ >= 0)
@@ -36,24 +37,18 @@ ShareThread::~ShareThread() {
         Finish();
 }
 
-void work(ShareThread &ShareThread, string cmd, string cmd_id, string target_str,
-          const std::string &ninja_host, const std::string &ninja_dir) {
-    // 执行gRPC客户端函数
-    Execute1Client execute1Client(grpc::CreateChannel(target_str,
-                                                      grpc::InsecureChannelCredentials()));
-    string result_output = execute1Client.Execute1(cmd, cmd_id, ninja_host, ninja_dir);
+void work(ShareThread &ShareThread, string shareproxy_addr, const std::string &ninja_host,
+          const std::string &ninja_dir, const std::string& root_dir, string cmd, string cmd_id) {
+    string result_output = ShareExecute(shareproxy_addr, ninja_host, ninja_dir, root_dir, cmd_id, cmd);
     ShareThread.result_output = result_output;
 }
 
 bool ShareThread::Start(ShareThreadSet* set, const string& command) {
-    // std::string target = g_rbe_config.master_addr;
-    // std::string ninja_host = g_rbe_config.self_ipv4_address;
-    // std::string ninja_dir = g_rbe_config.cwd;
-    // set->task_id ++;
-    // std::string task_id_str = ninja_host + "_" + to_string(set->task_id);
-    // thread t(work, std::ref(*this), command, task_id_str, target, ninja_host, ninja_dir);
-    // // std::cout << std::endl << "此时running队列里的任务数为" << set->running_.size() << std::endl;
-    // t.detach();
+    set->task_id ++;
+    std::string cmd_id = rbe_config_.self_ipv4_addr + "_" + to_string(set->task_id);
+    thread t(work, ref(*this), rbe_config_.shareproxy_addr, rbe_config_.self_ipv4_addr,
+             rbe_config_.cwd, rbe_config_.project_root, command, cmd_id);
+    t.detach();
     return true;
 }
 
@@ -158,8 +153,8 @@ ShareThreadSet::~ShareThreadSet() {
         Fatal("sigprocmask: %s", strerror(errno));
 }
 
-ShareThread *ShareThreadSet::Add(const EdgeCommand& cmd) {
-    ShareThread *shareThread = new ShareThread(cmd.use_console);
+ShareThread *ShareThreadSet::Add(const EdgeCommand& cmd, const ProjectConfig& config) {
+    ShareThread *shareThread = new ShareThread(cmd.use_console, config);
     if (!shareThread->Start(this, cmd.command)) {
         delete shareThread;
         return 0;

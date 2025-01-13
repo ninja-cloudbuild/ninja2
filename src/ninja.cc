@@ -55,6 +55,7 @@
 #ifndef _WIN32
 #include "thread_pool.h"
 #include "rbe_config.h"
+#include "share_build/sharebuild.h"
 #endif
 
 using namespace std;
@@ -1460,7 +1461,7 @@ int ReadFlags(int* argc, char*** argv,
     { "version", no_argument, NULL, OPT_VERSION },
     { "verbose", no_argument, NULL, 'v' },
     { "quiet", no_argument, NULL, OPT_QUIET },
-    { "sharebuild", required_argument, NULL, OPT_SHAREBUILD },  
+    { "sharebuild", no_argument, NULL, OPT_SHAREBUILD },  
     { "cloudbuild", required_argument, NULL, OPT_CLOUDBUILD },  
     { "project-root-dir", required_argument, NULL, OPT_PROJECT_ROOT_DIR },
     { NULL, 0, NULL, 0 }
@@ -1468,12 +1469,12 @@ int ReadFlags(int* argc, char*** argv,
 
   int opt;
   while (!options->tool &&
-         (opt = getopt_long(*argc, *argv, "s:c:r:d:f:j:k:l:nt:vw:C:h",
+         (opt = getopt_long(*argc, *argv, "sc:r:d:f:j:k:l:nt:vw:C:h",
                             kLongOptions, NULL)) != -1) {
     switch (opt) {
         case 's':  
         case OPT_SHAREBUILD:  // -s or --sharebuild  
-            config->share_run = true;   
+            config->share_run = true;
             break;  
         case 'c':  
         case OPT_CLOUDBUILD:  // -c or --cloudbuild  
@@ -1487,6 +1488,7 @@ int ReadFlags(int* argc, char*** argv,
         case OPT_PROJECT_ROOT_DIR:  // -r or --project-root-dir  
         {  
             config->rbe_config.project_root = optarg;   
+            std::cout << "project_root: " << config->rbe_config.project_root << std::endl;
             break;  
         } 
       case 'd':
@@ -1610,8 +1612,11 @@ NORETURN void real_main(int argc, char** argv) {
       printf("Enabled CloudBuild Mode, Please ensure that %s is running.\n", 
               config.rbe_config.grpc_url.c_str());
     }
-    if(config.share_run){
+    
+    if (config.share_run) {
       printf("Enabled ShareBuild Mode, Please ensure that ShareBuild is running.\n");
+      std::cout << "ShareBuild Server Address: " << config.rbe_config.shareproxy_addr << std::endl;
+      std::cout << "self_ipv4_addr: " << config.rbe_config.self_ipv4_addr << std::endl;
     }
     if(!config.rbe_config.rbe_properties["container-image"].empty()){
       printf("The DevContainer is configured. Please ensure that this project can be built in the VS Code DevContainer.\n");
@@ -1621,6 +1626,7 @@ NORETURN void real_main(int argc, char** argv) {
     printf("This project root directory is : %s \n", project_root.c_str());
     printf("---------------------------------------------------------------------------\n");
   }
+  
 
   #ifndef _WIN32
   SetThreadPoolThreadCount(GetProcessorCount());
@@ -1676,9 +1682,29 @@ NORETURN void real_main(int argc, char** argv) {
 
     ninja.ParsePreviousElapsedTimes();
 
+    if (config.share_run) {
+      bool ret = InitShareBuildEnv(config.rbe_config.shareproxy_addr,
+                                   config.rbe_config.self_ipv4_addr,
+                                   config.rbe_config.cwd, project_root,
+                                   config.rbe_config.rbe_properties["container-image"]);
+      if (!ret) {
+        Error("Failed to initialize sharebuild environment.");
+        exit(1);
+      }
+      Info("Success to initialize sharebuild environment.");
+    }
     int result = ninja.RunBuild(argc, argv, status);
     if (g_metrics)
       ninja.DumpMetrics();
+
+    if (config.share_run) {
+      bool ret = ClearShareBuildEnv(config.rbe_config.shareproxy_addr, config.rbe_config.self_ipv4_addr,
+                                    config.rbe_config.cwd, project_root);
+      if (!ret) {
+        Error("Failed to clear sharebuild environment.");
+        exit(1);
+      }
+    }
     exit(result);
   }
 
