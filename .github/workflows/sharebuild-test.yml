@@ -1,0 +1,110 @@
+name: Sharebuild Test
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  pull_request:
+    branches:
+      - master
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+      # 检出代码
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # 配置 apt 使用更快的镜像源（可选，根据地域选择）
+      - name: Configure apt to use faster mirrors
+        run: |
+          sudo sed -i 's/archive.ubuntu.com/mirrors.aliyun.com/g' /etc/apt/sources.list
+          sudo apt-get update
+
+
+      # 安装依赖
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git cmake g++ gcc googletest libgmock-dev libssl-dev pkg-config uuid-dev grpc++ libprotobuf-dev protobuf-compiler-grpc ninja-build libyaml-cpp-dev
+
+      # 运行构建脚本
+      - name: Build ninja2
+        run: |
+          chmod +x build.sh
+          ./build.sh build
+          ./build.sh package
+
+      # 安装构建好的 ninja2
+      - name: Install ninja2
+        run: |
+          sudo ./build.sh install
+
+      # 验证 ninja2 安装
+      - name: Verify ninja2 installation
+        run: |
+          ninja --version
+
+      - name: Configure NFS and Redis
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nfs-kernel-server redis-server
+
+          echo "/home *(rw,no_root_squash,anonuid=1000,anongid=1000,insecure,async,no_subtree_check)" | sudo tee -a /etc/exports
+          sudo exportfs -a
+          sudo systemctl restart nfs-kernel-server
+
+          sudo sed -i 's/bind 127.0.0.1/bind 0.0.0.0/' /etc/redis/redis.conf 
+          sudo sed -i 's/protected-mode yes/protected-mode no/' /etc/redis/redis.conf
+          sudo systemctl enable redis-server
+          sudo systemctl restart redis-server
+
+      - name: Start sharebuild server
+        run: |
+          wget https://github.com/chanfun-ren/executor/releases/download/v1.0.0/sharebulid-server
+          sudo ./sharebulid-server & echo $! > server.pid
+
+      - name: Configure ninja2 sharebuild mode
+        run: |
+          # Get primary IPv4 address
+          IPV4_ADDR=$(ip -4 addr show scope global | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -n 1)
+          echo "Detected IPv4 address: $IPV4_ADDR"
+
+          sudo tee /etc/ninja2.conf << EOF
+          ########## 分布式编译 server 配置(伴随安装 ninja2 时生成)######
+          sharebuild: true
+          shareproxy_addr: "localhost:50051"
+          self_ipv4_addr: "$IPV4_ADDR"
+          EOF
+    
+          # Verify content
+          cat /etc/ninja2.conf
+
+      - name: Sharebuild re2
+        run: | 
+          # 下载测试项目 re2
+          wget https://github.com/google/re2/archive/refs/tags/2021-11-01.tar.gz
+          tar -zxvf 2021-11-01.tar.gz
+          mv re2-2021-11-01 re2_sharebuild
+
+          cd re2_sharebuild
+          rm -rf build
+          mkdir -p build
+          cd build
+          cmake -G Ninja ..
+          # 分布式测试编译 re2
+          ninja -s -r "$(realpath ../)"
+     
+      - name: Show sharebuild-server logs
+        run: cat executor.log
+
+      # 测试 shabuild 编译出来的 re2 是否正常
+      - name: Test re2(sharebuild)
+        run: |
+          cd re2_sharebuild/build
+          ./re2_test
+          # ctest --output-on-failure
