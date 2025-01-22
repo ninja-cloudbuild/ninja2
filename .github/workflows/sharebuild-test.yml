@@ -11,7 +11,7 @@ on:
       - main
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-22.04
 
     steps:
@@ -65,8 +65,11 @@ jobs:
 
       - name: Start sharebuild server
         run: |
-          wget https://github.com/chanfun-ren/executor/releases/download/v1.0.0/sharebulid-server
-          sudo ./sharebulid-server & echo $! > server.pid
+          mkdir -p ~/sharebuild-bin
+          wget https://github.com/chanfun-ren/executor/releases/download/v1.0.0/sharebuild-server
+          chmod +x sharebuild-server
+          cp sharebuild-server ~/sharebuild-bin
+          sudo ~/sharebuild-bin/sharebuild-server & echo $! > server.pid
 
       - name: Configure ninja2 sharebuild mode
         run: |
