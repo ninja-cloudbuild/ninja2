@@ -59,17 +59,11 @@ function install {
   local install_path="/usr/bin/ninja"
   local backup_path="/usr/bin/ninja.prev"
   local config_file="/etc/ninja2.conf"
-  local backup_config_file="/etc/ninja2.conf.prev"
 
   # Backup existing ninja if it exists
   if [ -f "$install_path" ]; then
     sudo mv "$install_path" "$backup_path"
     success "Backed up original ninja to $backup_path"
-  fi
-  # Backup existing /etc/ninja2.conf if it exists
-  if [ -f "$config_file" ]; then
-    sudo mv "$config_file" "$backup_config_file"
-    success "Backed up original $config_file to $backup_config_file"
   fi
 
   # Install new ninja binary
