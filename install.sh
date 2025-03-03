@@ -74,7 +74,9 @@ function install {
 
   # Install new ninja binary
   sudo cp "ninja2/ninja" "$install_path"
-  sudo cp "ninja2/ninja2.conf" "$config_file"
+  if [ ! -f "$config_file" ]; then 
+	  sudo cp "ninja2/ninja2.conf" "$config_file"
+  fi
   sudo cp -n ninja2/*.so.* /usr/local/lib/
   sudo ldconfig
   success "---------------------------------"
