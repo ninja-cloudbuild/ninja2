@@ -8,7 +8,8 @@
 #include "util.h"
 #include "build.h"
 
-// load /etc/ninja2.conf
+// load .ninja2.conf or $HOME/.ninja2.conf
+bool load_config_file(BuildConfig &config);
 bool load_config_file(BuildConfig &config);
 // Loads the devcontainer configuration from the specified project root  
 void load_devcontainer_config(const std::string& project_root, BuildConfig &config);
