@@ -19,6 +19,7 @@ service ShareBuildProxy {
 message InitializeBuildEnvRequest {
   Project project = 1;
   string container_image = 2; // ninja2 指定的项目运行的镜像地址
+  int32 worker_num = 3;
 }
 
 message InitializeBuildEnvResponse {

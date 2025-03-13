@@ -1454,7 +1454,8 @@ int ReadFlags(int* argc, char*** argv,
       OPT_QUIET = 2,   
       OPT_SHAREBUILD = 3,  
       OPT_CLOUDBUILD = 4,  
-      OPT_PROJECT_ROOT_DIR = 5  
+      OPT_PROJECT_ROOT_DIR = 5,
+      OPT_WORKER_NUM = 6
   };  
   const option kLongOptions[] = {
     { "help", no_argument, NULL, 'h' },
@@ -1464,18 +1465,31 @@ int ReadFlags(int* argc, char*** argv,
     { "sharebuild", no_argument, NULL, OPT_SHAREBUILD },  
     { "cloudbuild", required_argument, NULL, OPT_CLOUDBUILD },  
     { "project-root-dir", required_argument, NULL, OPT_PROJECT_ROOT_DIR },
+    { "worker-num", required_argument, NULL, OPT_WORKER_NUM },
     { NULL, 0, NULL, 0 }
   };
 
   int opt;
   while (!options->tool &&
-         (opt = getopt_long(*argc, *argv, "sc:r:d:f:j:k:l:nt:vw:C:h",
+         (opt = getopt_long(*argc, *argv, "sm:c:r:d:f:j:k:l:nt:vw:C:h",
                             kLongOptions, NULL)) != -1) {
     switch (opt) {
         case 's':  
         case OPT_SHAREBUILD:  // -s or --sharebuild  
             config->share_run = true;
             break;  
+        case 'm':  // -m
+        case OPT_WORKER_NUM:  // --worker-num
+        {
+            char* end;
+            int value = strtol(optarg, &end, 10);
+            if (*end != 0 || value < 0) {
+                Fatal("invalid -m/--worker-num parameter");
+            }
+            config->rbe_config.worker_num = value;
+            std::cout << "worker_num: " << config->rbe_config.worker_num << std::endl;
+            break;
+        }
         case 'c':  
         case OPT_CLOUDBUILD:  // -c or --cloudbuild  
             config->cloud_run = true;  
@@ -1683,10 +1697,7 @@ NORETURN void real_main(int argc, char** argv) {
     ninja.ParsePreviousElapsedTimes();
 
     if (config.share_run) {
-      bool ret = InitShareBuildEnv(config.rbe_config.shareproxy_addr,
-                                   config.rbe_config.self_ipv4_addr,
-                                   config.rbe_config.cwd, project_root,
-                                   config.rbe_config.rbe_properties["container-image"]);
+      bool ret = InitShareBuildEnv(config.rbe_config);
       if (!ret) {
         Error("Failed to initialize sharebuild environment.");
         exit(1);
@@ -1698,8 +1709,7 @@ NORETURN void real_main(int argc, char** argv) {
       ninja.DumpMetrics();
 
     if (config.share_run) {
-      bool ret = ClearShareBuildEnv(config.rbe_config.shareproxy_addr, config.rbe_config.self_ipv4_addr,
-                                    config.rbe_config.cwd, project_root);
+      bool ret = ClearShareBuildEnv(config.rbe_config);
       if (!ret) {
         Error("Failed to clear sharebuild environment.");
         exit(1);

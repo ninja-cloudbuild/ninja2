@@ -4,21 +4,12 @@
 #include <string>
 
 #include "proxy_service_client.h"
+#include "../build.h"
 
-bool InitShareBuildEnv(const std::string& proxy_service_address,
-                       const std::string& ninja_host,
-                       const std::string& ninja_build_dir,
-                       const std::string& root_dir,
-                       const std::string& container_image);
+bool InitShareBuildEnv(const ProjectConfig& rbe_config);
 
-bool ClearShareBuildEnv(const std::string& proxy_service_address,
-                        const std::string& ninja_host,
-                        const std::string& ninja_build_dir,
-                        const std::string& root_dir);
+bool ClearShareBuildEnv(const ProjectConfig& rbe_config);
 
-std::string ShareExecute(const std::string& proxy_service_address,
-                         const std::string& ninja_host,
-                         const std::string& ninja_build_dir,
-                         const std::string& root_dir,
+std::string ShareExecute(const ProjectConfig& rbe_config, 
                          const std::string& cmd_id,
-                         const std::string& cmd);
+                         const std::string& cmd_content);

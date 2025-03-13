@@ -37,17 +37,15 @@ ShareThread::~ShareThread() {
         Finish();
 }
 
-void work(ShareThread &ShareThread, string shareproxy_addr, const std::string &ninja_host,
-          const std::string &ninja_dir, const std::string& root_dir, string cmd, string cmd_id) {
-    string result_output = ShareExecute(shareproxy_addr, ninja_host, ninja_dir, root_dir, cmd_id, cmd);
+void work(ShareThread &ShareThread, const ProjectConfig& rbe_config, string cmd_id, string cmd) {
+    string result_output = ShareExecute(rbe_config, cmd_id, cmd);
     ShareThread.result_output = result_output;
 }
 
 bool ShareThread::Start(ShareThreadSet* set, const string& command) {
     set->task_id ++;
     std::string cmd_id = rbe_config_.self_ipv4_addr + "_" + to_string(set->task_id);
-    thread t(work, ref(*this), rbe_config_.shareproxy_addr, rbe_config_.self_ipv4_addr,
-             rbe_config_.cwd, rbe_config_.project_root, command, cmd_id);
+    thread t(work, ref(*this), rbe_config_, cmd_id, command);
     t.detach();
     return true;
 }

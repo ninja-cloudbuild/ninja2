@@ -1,4 +1,5 @@
 #include <grpcpp/grpcpp.h>
+#include <cstdint>
 
 #include "proxy_service_client.h"
 #include "proxy.grpc.pb.h"
@@ -9,7 +10,7 @@ ProxyServiceClient::ProxyServiceClient(std::shared_ptr<grpc::Channel> channel)
 
 
 bool ProxyServiceClient::InitializeBuildEnv(const std::string& ninja_host, const std::string& ninja_build_dir, 
-                                            const std::string& root_dir, const std::string& container_image) {
+                                            const std::string& root_dir, const std::string& container_image, int32_t worker_num) {
     api::InitializeBuildEnvRequest request;
     api::Project project;
 
@@ -18,6 +19,7 @@ bool ProxyServiceClient::InitializeBuildEnv(const std::string& ninja_host, const
     project.set_ninja_dir(ninja_build_dir);
     *request.mutable_project() = project;
     request.set_container_image(container_image);
+    request.set_worker_num(worker_num);
 
     api::InitializeBuildEnvResponse response;
     grpc::ClientContext context;

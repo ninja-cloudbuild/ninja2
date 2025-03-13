@@ -15,6 +15,7 @@
 #ifndef NINJA_BUILD_H_
 #define NINJA_BUILD_H_
 
+#include <cstdint>
 #include <cstdio>
 #include <map>
 #include <memory>
@@ -167,6 +168,7 @@ struct ProjectConfig {
   std::string cwd;                                        // current working directory(i.e. ninjaDir). eg: ~/proj/build
   std::string project_root;                               // project root directory. eg: ~/proj
   std::map<std::string, std::string> rbe_properties;      // remote build execution properties
+  int32_t worker_num = 5;                                 // number of remote workers for p2pbuild
   
   std::string shareproxy_addr;
   std::string self_ipv4_addr;

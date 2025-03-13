@@ -12,38 +12,26 @@ ProxyServiceClient CreateProxyClient(const std::string& proxy_service_address) {
   return ProxyServiceClient(channel);
 }
 
-bool InitShareBuildEnv(const std::string& proxy_service_address,
-                       const std::string& ninja_host,
-                       const std::string& ninja_build_dir,
-                       const std::string& root_dir,
-                       const std::string& container_image) {
-  ProxyServiceClient proxy_client = CreateProxyClient(proxy_service_address);
-  bool init_env_res = proxy_client.InitializeBuildEnv(
-      ninja_host, ninja_build_dir, root_dir, container_image);
-  // std::cout << "初始化环境结果 init_env_res is " << init_env_res << std::endl;
+bool InitShareBuildEnv(const ProjectConfig &rbe_config) {
+  ProxyServiceClient proxy_client = CreateProxyClient(rbe_config.shareproxy_addr);
+  bool init_env_res = proxy_client.InitializeBuildEnv(rbe_config.self_ipv4_addr, 
+        rbe_config.cwd, rbe_config.project_root, rbe_config.rbe_properties.at("container-image"), 
+        rbe_config.worker_num);
   return init_env_res;
 }
 
-bool ClearShareBuildEnv(const std::string& proxy_service_address,
-                        const std::string& ninja_host,
-                        const std::string& ninja_build_dir,
-                        const std::string& root_dir) {
-  ProxyServiceClient proxy_client = CreateProxyClient(proxy_service_address);
-  bool clear_env_res = proxy_client.ClearBuildEnv(
-      ninja_host, ninja_build_dir, root_dir);
-  // std::cout << "清理环境结果 clear_env_res is " << clear_env_res << std::endl;
+bool ClearShareBuildEnv(const ProjectConfig &rbe_config) {
+  ProxyServiceClient proxy_client = CreateProxyClient(rbe_config.shareproxy_addr);
+  bool clear_env_res = proxy_client.ClearBuildEnv(rbe_config.self_ipv4_addr, 
+          rbe_config.cwd, rbe_config.project_root);
   return clear_env_res;
 }
 
-std::string ShareExecute(const std::string& proxy_service_address,
-                         const std::string& ninja_host,
-                         const std::string& ninja_build_dir,
-                         const std::string& root_dir,
+std::string ShareExecute(const ProjectConfig& rbe_config, 
                          const std::string& cmd_id,
-                         const std::string& cmd) {
-  ProxyServiceClient proxy_client = CreateProxyClient(proxy_service_address);
-  std::string result_output = proxy_client.Execute(
-      ninja_host, ninja_build_dir, root_dir, cmd_id, cmd);
-  // std::cout << result_output << std::endl;
+                         const std::string& cmd_content) {
+  ProxyServiceClient proxy_client = CreateProxyClient(rbe_config.shareproxy_addr);
+  std::string result_output = proxy_client.Execute(rbe_config.self_ipv4_addr,
+                rbe_config.cwd, rbe_config.project_root, cmd_id, cmd_content);
   return result_output;
 }

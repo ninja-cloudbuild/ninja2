@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <grpcpp/grpcpp.h>
 
@@ -10,9 +11,9 @@ class ProxyServiceClient {
  public:
   ProxyServiceClient(std::shared_ptr<grpc::Channel> channel);
 
-  
-  bool InitializeBuildEnv(const std::string& ninja_host, const std::string& ninja_build_dir, const std::string& root_dir, const std::string& container_image);
-  bool ClearBuildEnv(const std::string& ninja_host, const std::string& ninja_dir, const std::string& root_dir);
+  bool InitializeBuildEnv(const std::string& ninja_host, const std::string& ninja_build_dir, const std::string& root_dir, const std::string& container_image, int32_t worker_num);
+
+  bool ClearBuildEnv(const std::string& ninja_host, const std::string& ninja_build_dir, const std::string& root_dir);
 
   std::string Execute(const std::string& ninja_host, const std::string& ninja_build_dir, const std::string& root_dir, const std::string& cmd_id, const std::string& cmd);
 
