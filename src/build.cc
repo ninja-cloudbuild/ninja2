@@ -644,8 +644,8 @@ size_t ShareCommandRunner::CanRunMore() const {
   size_t subproc_number =
       share_threads_.running_.size() + share_threads_.finished_.size();
   
-  int processors = GetProcessorCount();
-  int64_t capacity = config_.rbe_config.worker_num * processors - subproc_number;
+  int single_paral = GetProcessorCount() + 2;
+  int64_t capacity = config_.rbe_config.worker_num * single_paral - subproc_number;
 
   if (config_.max_load_average > 0.0f) {
     int load_capacity = config_.max_load_average - GetLoadAverage();
