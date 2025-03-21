@@ -30,7 +30,7 @@ message InitializeBuildEnvResponse {
 message ForwardAndExecuteRequest {
   Project project = 1;    // cmd 所属项目信息
   string cmd_id = 2;      // cmd id
-  string cmd_content = 3; // cmd 内容
+  bytes cmd_content = 3; // cmd 内容
 }
 
 message ForwardAndExecuteResponse {
