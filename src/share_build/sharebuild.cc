@@ -3,12 +3,6 @@
 
 ProxyServiceClient CreateProxyClient(const std::string& proxy_service_address) {
   std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel(proxy_service_address, grpc::InsecureChannelCredentials());
-  // grpc_connectivity_state state = channel->GetState(true);
-  // if (state == GRPC_CHANNEL_READY) {
-  //     std::cout << "Channel is ready" << std::endl;
-  // } else {
-  //     std::cerr << "Channel is not ready, state: " << state << std::endl;
-  // }
   return ProxyServiceClient(channel);
 }
 
@@ -27,11 +21,14 @@ bool ClearShareBuildEnv(const ProjectConfig &rbe_config) {
   return clear_env_res;
 }
 
-std::string ShareExecute(const ProjectConfig& rbe_config, 
+std::pair<int, std::string> ShareExecute(const ProjectConfig& rbe_config, 
                          const std::string& cmd_id,
                          const std::string& cmd_content) {
-  ProxyServiceClient proxy_client = CreateProxyClient(rbe_config.shareproxy_addr);
-  std::string result_output = proxy_client.Execute(rbe_config.self_ipv4_addr,
-                rbe_config.cwd, rbe_config.project_root, cmd_id, cmd_content);
-  return result_output;
+  static ProxyServiceClientPool pool(rbe_config.shareproxy_addr, 50);
+  ProxyServiceClient* client = pool.GetClient();
+  return client->Execute(rbe_config.self_ipv4_addr,
+                          rbe_config.cwd,
+                          rbe_config.project_root,
+                          cmd_id,
+                          cmd_content);
 }

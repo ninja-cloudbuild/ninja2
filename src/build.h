@@ -34,6 +34,7 @@ struct Edge;
 struct Node;
 struct State;
 struct Status;
+struct CommandRunner;
 
 /// Plan stores the state of a build plan: what we intend to build,
 /// which steps we're ready to execute.
@@ -52,8 +53,13 @@ struct Plan {
   /// Returns true if there's more work to be done.
   bool more_to_do() const { return wanted_edges_ > 0 && command_edges_ > 0; }
 
+  /// Returns the number of edges that are ready but not claimed by a running
+  int ready_edge_count() const { return ready_.size(); }
+
   /// Dumps the current state of the plan.
   void Dump() const;
+
+  void Progress(CommandRunner* runner);
 
   enum EdgeResult {
     kEdgeFailed,

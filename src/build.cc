@@ -19,8 +19,10 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
 #include <climits>
+#include <cstdint>
 #include <functional>
 #include <unordered_set>
 
@@ -614,16 +616,37 @@ void Plan::Dump() const {
   printf("ready: %d\n", (int)ready_.size());
 }
 
+void Plan::Progress(CommandRunner* runner) {
+  char time_buf[64];
+  auto now = std::chrono::system_clock::now();
+  auto now_time_t = std::chrono::system_clock::to_time_t(now);
+  auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+      now - std::chrono::system_clock::from_time_t(now_time_t)).count();
+  
+  struct tm timeinfo;
+  localtime_r(&now_time_t, &timeinfo);
+  strftime(time_buf, sizeof(time_buf), "%H:%M:%S", &timeinfo);
+  
+  char full_time[128];
+  snprintf(full_time, sizeof(full_time), "%s.%03ld", time_buf, ms);
+  
+  printf("\n[%s], pending/wanted: %d, ", full_time, (int)want_.size());
+  printf("ready: %d, ", (int)ready_.size());
+  printf("running: %d\n\n", (int)runner->GetActiveEdges().size());
+}
+
 struct ShareCommandRunner : public CommandRunner {
-  explicit ShareCommandRunner(const BuildConfig& config) : config_(config) {}
+  explicit ShareCommandRunner(const BuildConfig& config, const Plan& plan) 
+              : config_(config), plan_(plan), share_threads_(config.rbe_config) {}
   virtual ~ShareCommandRunner() {}
   virtual size_t CanRunMore() const override;
-  virtual bool StartCommand(Edge* work) override;
+  virtual bool StartCommand(Edge* edge) override;
   virtual bool WaitForCommand(Result* result) override;
-  virtual vector<Edge*> GetActiveEdges();
-  virtual void Abort();
+  virtual vector<Edge*> GetActiveEdges() override;
+  virtual void Abort() override;
 
   const BuildConfig& config_;
+  const Plan& plan_;
   ShareThreadSet share_threads_;
   map<ShareThread*, Edge*> thread_to_edge_;
 };
@@ -644,14 +667,7 @@ size_t ShareCommandRunner::CanRunMore() const {
   size_t subproc_number =
       share_threads_.running_.size() + share_threads_.finished_.size();
   
-  int single_paral = GetProcessorCount() + 2;
-  int64_t capacity = config_.rbe_config.worker_num * single_paral - subproc_number;
-
-  if (config_.max_load_average > 0.0f) {
-    int load_capacity = config_.max_load_average - GetLoadAverage();
-    if (load_capacity < capacity)
-      capacity = load_capacity;
-  }
+  int capacity = plan_.ready_edge_count();
 
   if (capacity < 0)
     capacity = 0;
@@ -683,9 +699,6 @@ bool ShareCommandRunner::WaitForCommand(Result* result) {
   }
 
   result->status = share_thread->Finish();
-// #ifndef _WIN32
-//   result->rusage = *share_thread->GetUsage();
-// #endif
   result->output = share_thread->GetOutput(); //拿到 share_thread 的 result_output
 
   map<ShareThread*, Edge*>::iterator e = thread_to_edge_.find(share_thread);
@@ -782,7 +795,7 @@ struct CloudCommandRunner : public CommandRunner {
       : config_(config), remote_procs_(config.parallelism * proportion) {}
   virtual ~CloudCommandRunner() {}
   virtual size_t CanRunMore() const override;
-  virtual bool StartCommand(Edge* work) override;
+  virtual bool StartCommand(Edge* edge) override;
   virtual bool WaitForCommand(Result* result) override;
   virtual vector<Edge*> GetActiveEdges() override;
   virtual void Abort() override;
@@ -823,19 +836,13 @@ bool CloudCommandRunner::StartCommand(Edge* edge) {
   if(config_.rbe_config.local_only_rules.find(cmd_rule) != config_.rbe_config.local_only_rules.end()){
     SubprocessSet subprocset;
     Subprocess* subproc = subprocset.Add(spawn->command,edge->use_console());
-    if (!subproc) {
-      return false;
-    }   
-    return true;
+    return subproc != nullptr;
   }
   for(auto &cmd:config_.rbe_config.fuzzy_rules){
     if(cmd.find(cmd_rule)!=std::string::npos){
     SubprocessSet subprocset;
     Subprocess* subproc = subprocset.Add(spawn->command,edge->use_console());
-    if (!subproc) {
-      return false;
-    }   
-    return true;
+    return subproc != nullptr;
     }
   }
   RemoteProcess* remoteproc = remote_procs_.Add(spawn);
@@ -995,7 +1002,7 @@ bool Builder::Build(string* err) {
     }
 #endif
     else if (config_.share_run) {
-        command_runner_.reset(new ShareCommandRunner(config_));
+        command_runner_.reset(new ShareCommandRunner(config_, plan_));
     } else {
         command_runner_.reset(new RealCommandRunner(config_));
     }
@@ -1011,6 +1018,9 @@ bool Builder::Build(string* err) {
   // Second, we attempt to wait for / reap the next finished command.
   while (plan_.more_to_do()) {
     // See if we can start any more commands.
+    // 打印当前状态
+    // wanted/pending, ready.
+    // plan_.Progress(command_runner_.get());
     if (failures_allowed) {
         size_t capacity = command_runner_->CanRunMore();
         while (capacity > 0) {

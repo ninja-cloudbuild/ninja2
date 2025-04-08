@@ -8,6 +8,11 @@
 ProxyServiceClient::ProxyServiceClient(std::shared_ptr<grpc::Channel> channel)
     : stub_(api::ShareBuildProxy::NewStub(channel)) {}
 
+ProxyServiceClient::ProxyServiceClient(const std::string& proxy_address) {
+    std::shared_ptr<grpc::Channel> channel = grpc::CreateChannel(proxy_address, grpc::InsecureChannelCredentials());
+    stub_ = api::ShareBuildProxy::NewStub(channel);
+}
+
 
 bool ProxyServiceClient::InitializeBuildEnv(const std::string& ninja_host, const std::string& ninja_build_dir, 
                                             const std::string& root_dir, const std::string& container_image, int32_t worker_num) {
@@ -58,7 +63,8 @@ bool ProxyServiceClient::ClearBuildEnv(const std::string& ninja_host, const std:
     return true;
 }
 
-std::string ProxyServiceClient::Execute(const std::string& ninja_host, const std::string& ninja_build_dir,
+// {exit_code, result_output} 
+std::pair<int, std::string> ProxyServiceClient::Execute(const std::string& ninja_host, const std::string& ninja_build_dir,
                                         const std::string& root_dir, const std::string& cmd_id, const std::string& cmd) {
     api::ForwardAndExecuteRequest request;
     api::Project project;
@@ -73,14 +79,47 @@ std::string ProxyServiceClient::Execute(const std::string& ninja_host, const std
     grpc::ClientContext context;
     grpc::Status status = stub_->ForwardAndExecute(&context, request, &response);
     if (!status.ok()) {
-        std::cerr << "ForwardAndExecute rpc failed." << std::endl;
-        return "";
+        std::cout << "cmd_id: " << cmd_id << ", cmd_content: " << cmd <<  ", ForwardAndExecute rpc failed, "
+                  << "error code: " << status.error_code()
+                  << ", msg: " << status.error_message() << std::endl;
+        return {-1, "rcp failed"};
     }
 
-    std::string result = "cmd_id: " + response.id();
-    result += ", status: " + response.status().DebugString();
-    result += "stdout: " + response.std_out();
-    result += ", stderr: " + response.std_err();
+    int exit_code = 0;
+    if (response.status().code() != api::PROXY_OK) {
+        std::cout << "[remote execute failed.]" << "cmd_id: " << cmd_id << ", cmd_content: " << cmd;
+        exit_code = -1;
+    }
 
-    return result;
+    std::string result;
+    result += "share_stdout: " + response.std_out();
+    result += ", share_stderr: " + response.std_err();
+
+    return {exit_code, result};
+}
+
+AsyncProxyClient::AsyncProxyClient(std::shared_ptr<grpc::Channel> channel, grpc::CompletionQueue* cq) 
+    : stub_(api::ShareBuildProxy::NewStub(channel)), cq_(cq) {}
+
+
+void AsyncProxyClient::AsyncExecute(const api::ForwardAndExecuteRequest& request, 
+                      std::function<void(const api::ForwardAndExecuteResponse&, grpc::Status)> callback) {
+    auto* call = new AsyncCall;
+    call->response_reader = stub_->AsyncForwardAndExecute(&call->context, request, cq_);
+    call->response_reader->Finish(&call->response, &call->status, (void*)call);
+    call->callback = callback;
+}
+
+void AsyncProxyClient::ProcessQueue() {
+    void* tag;
+    bool ok = false;
+    while (cq_->Next(&tag, &ok)) {
+        AsyncCall* call = static_cast<AsyncCall*>(tag);
+        if (ok) {
+            call->callback(call->response, call->status);
+        } else {
+            call->callback(call->response, grpc::Status(grpc::StatusCode::INTERNAL, "Request failed"));
+        }
+        delete call;
+    }
 }
