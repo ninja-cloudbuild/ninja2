@@ -83,6 +83,9 @@ struct Options {
   /// Tool to run rather than building.
   const Tool* tool;
 
+  /// Whether duplicate rules for one target should warn or print an error.
+  bool dupe_edges_should_err;
+
   /// Whether phony cycles should warn or print an error.
   bool phony_cycle_should_err;
 };
@@ -1237,6 +1240,12 @@ bool WarningEnable(const string& name, Options* options) {
 "  phonycycle={err,warn}  phony build statement references itself\n"
     );
     return false;
+  } else if (name == "dupbuild=err") {
+    options->dupe_edges_should_err = true;
+    return true;
+  } else if (name == "dupbuild=warn") {
+    options->dupe_edges_should_err = false;
+    return true;
   } else if (name == "phonycycle=err") {
     options->phony_cycle_should_err = true;
     return true;
@@ -1248,8 +1257,11 @@ bool WarningEnable(const string& name, Options* options) {
     Warning("deprecated warning 'depfilemulti'");
     return true;
   } else {
-    const char* suggestion = SpellcheckString(name.c_str(), "phonycycle=err",
-                                              "phonycycle=warn", nullptr);
+    const char* suggestion =
+        SpellcheckString(name.c_str(), "dupbuild=err", "dupbuild=warn",
+                         "phonycycle=err", "phonycycle=warn", NULL);
+    // const char* suggestion = SpellcheckString(name.c_str(), "phonycycle=err",
+    //                                           "phonycycle=warn", nullptr);
     if (suggestion) {
       Error("unknown warning flag '%s', did you mean '%s'?",
             name.c_str(), suggestion);
@@ -1588,6 +1600,7 @@ NORETURN void real_main(int argc, char** argv) {
   load_config_file(config);
   Options options = {};
   options.input_file = "build.ninja";
+  options.dupe_edges_should_err = true;
 
   setvbuf(stdout, NULL, _IOLBF, BUFSIZ);
   const char* ninja_command = argv[0];
@@ -1659,6 +1672,9 @@ NORETURN void real_main(int argc, char** argv) {
     NinjaMain ninja(ninja_command, config);
 
     ManifestParserOptions parser_opts;
+    if (options.dupe_edges_should_err) {
+      parser_opts.dupe_edge_action_ = kDupeEdgeActionError;
+    }
     if (options.phony_cycle_should_err) {
       parser_opts.phony_cycle_action_ = kPhonyCycleActionError;
     }
