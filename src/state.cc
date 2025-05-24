@@ -133,17 +133,20 @@ void State::AddIn(Edge* edge, StringPiece path, uint64_t slash_bits) {
   node->AddOutEdge(edge);
 }
 
-bool State::AddOut(Edge* edge, StringPiece path, uint64_t slash_bits,
-                   std::string* err) {
+// bool State::AddOut(Edge* edge, StringPiece path, uint64_t slash_bits,
+//                    std::string* err) {
+bool State::AddOut(Edge* edge, StringPiece path, uint64_t slash_bits) {
   Node* node = GetNode(path, slash_bits);
-  if (Edge* other = node->in_edge()) {
-    if (other == edge) {
-      *err = path.AsString() + " is defined as an output multiple times";
-    } else {
-      *err = "multiple rules generate " + path.AsString();
-    }
+  if (node->in_edge())
     return false;
-  }
+  // if (Edge* other = node->in_edge()) {
+  //   if (other == edge) {
+  //     *err = path.AsString() + " is defined as an output multiple times";
+  //   } else {
+  //     *err = "multiple rules generate " + path.AsString();
+  //   }
+  //   return false;
+  // }
   edge->outputs_.push_back(node);
   node->set_in_edge(edge);
   node->set_generated_by_dep_loader(false);
