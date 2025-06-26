@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.15)
 
 # set(CMAKE_PREFIX_PATH ./protos/lib/cmake)
 set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 include(CheckSymbolExists)
 include(CheckIPOSupported)
 
@@ -337,6 +338,9 @@ if(BUILD_TESTING)
     src/subprocess_test.cc
     src/test.cc
     src/util_test.cc
+	)
+  add_executable(remote_api_test
+	src/remote_executor/remote_apis_test.cc
   )
   if(WIN32)
     target_sources(ninja_test PRIVATE src/includes_normalize_test.cc src/msvc_helper_test.cc
@@ -344,8 +348,10 @@ if(BUILD_TESTING)
   endif()
   find_package(Threads REQUIRED)
   target_link_libraries(ninja_test PRIVATE libninja libninja-re2c GTest::gtest Threads::Threads)
+  target_link_libraries(remote_api_test PRIVATE libninja libninja-re2c GTest::gtest Threads::Threads)
   # share build   	
   target_include_directories(ninja_test PUBLIC ${CMAKE_SOURCE_DIR}/src PUBLIC ${PROTO_GEN_DIR})
+  target_include_directories(remote_api_test PUBLIC ${CMAKE_SOURCE_DIR}/src PUBLIC ${PROTO_GEN_DIR})
   message(STATUS "PROTO_GEN_DIR: ${PROTO_GEN_DIR}")
 
 
@@ -368,6 +374,8 @@ if(BUILD_TESTING)
   endif()
 
   add_test(NAME NinjaTest COMMAND ninja_test)
+  add_test(NAME RemoteApiTest COMMAND remote_api_test)
+  
 endif()
 
 if(NINJA_BUILD_BINARY)
