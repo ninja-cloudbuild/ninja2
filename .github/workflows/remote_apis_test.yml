@@ -1,0 +1,103 @@
+name: Remote_Apis TEST
+
+on:
+  pull_request:
+  push:
+  release:
+    types: published
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    services:
+      redis:
+        image: redis:6.2
+        ports:
+          - 6379:6379
+    steps:
+      # 测试redis服务
+      - name: Test Redis connection
+        run: |
+          docker exec $(docker ps -q --filter ancestor=redis:6.2) redis-cli -h localhost ping
+      # 1. 检出代码
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. 配置 apt 使用更快的镜像源（可选，根据地域选择）
+      - name: Configure apt to use faster mirrors
+        run: |
+          sudo sed -i 's/archive.ubuntu.com/mirrors.aliyun.com/g' /etc/apt/sources.list
+          sudo apt-get update
+
+      # 4. 安装客户端依赖
+      - name: Install client dependencies
+        # if: steps.apt-cache.outputs.cache-hit != 'true' （仅在缓存未命中时）
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git cmake g++ gcc googletest libgmock-dev libssl-dev pkg-config uuid-dev grpc++ libprotobuf-dev protobuf-compiler-grpc ninja-build libyaml-cpp-dev zip unzip
+
+      # # 5. 缓存 CMake 和构建产物（可选）
+      # - name: Cache CMake and build
+      #   uses: actions/cache@v3
+      #   with:
+      #     path: |
+      #       ~/.cache
+      #       build
+      #     key: ${{ runner.os }}-cmake-${{ hashFiles('**/CMakeLists.txt') }}
+      #     restore-keys: |
+      #       ${{ runner.os }}-cmake-
+
+      # 6. 运行构建脚本
+      - name: Build ninja2
+        run: |
+          chmod +x build.sh
+          ./build.sh build
+          ./build.sh package
+
+      # 7. 安装构建好的 ninja2
+      - name: Install ninja2
+        run: |
+          sudo ./build.sh install
+
+      # 8. 验证 ninja2 安装
+      - name: Verify ninja2 installation
+        run: |
+          ninja --version
+
+      # 9. 运行 Ninja 单元测试套件
+      - name: Run Ninja unit-test suite
+        run: |
+          cd build/bin
+          ctest --output-on-failure
+
+      # 10. 安装服务端需要的依赖
+      - name: Install server dependencies
+        run: |
+          wget https://github.com/bazelbuild/bazel/releases/download/6.0.0/bazel-6.0.0-installer-linux-x86_64.sh
+          chmod +x bazel-6.0.0-installer-linux-x86_64.sh 
+          ./bazel-6.0.0-installer-linux-x86_64.sh --user
+          export PATH=$PATH:~/bin
+      # 11. 安装服务端
+      - name: build server
+        run: |
+          git clone https://gitee.com/cloudbuild888/buildbuddy.git
+          cd buildbuddy
+          bazel build //enterprise/server:server
+      # 12. 安装executor
+      - name: build executor
+        run: |
+          cd buildbuddy
+          bazel build //enterprise/server/cmd/executor:executor
+      - name: run server
+        run: |
+          cd buildbuddy
+          nohup bazel run //enterprise/server:server &
+      - name: run executor
+        run: |
+          cd buildbuddy
+          nohup bazel run //enterprise/server/cmd/executor:executor &
+      # 测试 remote-api 的接口
+      - name: Run remote_api_test
+        run: |
+          cd build/bin
+          ./remote_api_test
