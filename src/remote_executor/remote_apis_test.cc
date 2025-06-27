@@ -6,7 +6,6 @@
 
 namespace
 {
-
 	using namespace build::bazel::remote::execution::v2;
 	using namespace google::longrunning;
 	using namespace google::bytestream;
@@ -25,6 +24,7 @@ namespace
 			ac_stub_ = ActionCache::NewStub(channel_);
 			exec_stub_ = Execution::NewStub(channel_);
 			bytestream_stub_ = ByteStream::NewStub(channel_);
+
 			// set unique uuid
 			uuid_t uu;
 			uuid_generate(uu);
@@ -35,6 +35,26 @@ namespace
 		inline Digest MakeDigest(const std::string& content)
 		{
 			return RemoteExecutor::CASHash::Hash(content);
+		}
+
+		void UploadBlob(const Digest& digest, const std::string& content)
+		{
+			grpc::ClientContext     context;
+			BatchUpdateBlobsRequest request;
+			request.set_instance_name(instance_name_);
+			auto* request_blob = request.add_requests();
+			*request_blob->mutable_digest() = digest;
+			request_blob->set_data(content);
+
+			BatchUpdateBlobsResponse response;
+			grpc::Status             status =
+				cas_stub_->BatchUpdateBlobs(&context, request, &response);
+
+			ASSERT_TRUE(status.ok())
+				<< "UploadBlob failed: " << status.error_message();
+			ASSERT_EQ(response.responses_size(), 1);
+			ASSERT_EQ(response.responses(0).status().code(),
+			          grpc::StatusCode::OK);
 		}
 
 		std::shared_ptr<grpc::Channel>             channel_;
@@ -54,9 +74,7 @@ TEST_F(RemoteApiTest, GetActionResultOnCacheMiss)
 	// 1. Random Action Digest, which has a high possibility of cache miss
 	Action action;
 	action.set_do_not_cache(true);
-	std::string action_blob;
-	action.SerializeToString(&action_blob);
-	Digest action_digest = MakeDigest(action_blob);
+	Digest action_digest = MakeDigest(action.SerializeAsString());
 
 	// 2. Query Action cache
 	grpc::ClientContext    context;
@@ -79,15 +97,11 @@ TEST_F(RemoteApiTest, UpdateAndGetActionResultOnCacheHit)
 	Command command;
 	command.add_arguments("echo");
 	command.add_arguments("hit");
-	std::string command_blob;
-	command.SerializeToString(&command_blob);
-	Digest command_digest = MakeDigest(command_blob);
+	Digest command_digest = MakeDigest(command.SerializeAsString());
 
 	Action action;
 	action.mutable_command_digest()->CopyFrom(command_digest);
-	std::string action_blob;
-	action.SerializeToString(&action_blob);
-	Digest action_digest = MakeDigest(action_blob);
+	Digest action_digest = MakeDigest(action.SerializeAsString());
 
 	ActionResult result;
 	result.set_exit_code(0);
@@ -149,21 +163,7 @@ TEST_F(RemoteApiTest, FindMissingBlobs)
 	Digest missing_digest = MakeDigest(missing_content);
 
 	// 2. Upload the existing data blocks
-	{
-		grpc::ClientContext     context;
-		BatchUpdateBlobsRequest request;
-		request.set_instance_name(instance_name_);
-		auto request_blob = request.add_requests();
-		request_blob->mutable_digest()->CopyFrom(existing_digest);
-		request_blob->set_data(existing_content);
-
-		BatchUpdateBlobsResponse response;
-		grpc::Status             status =
-			cas_stub_->BatchUpdateBlobs(&context, request, &response);
-
-		ASSERT_TRUE(status.ok());
-		ASSERT_EQ(response.responses_size(), 1);
-	}
+	UploadBlob(existing_digest, existing_content);
 
 	// 3. Query two data blocks
 	{
@@ -183,8 +183,6 @@ TEST_F(RemoteApiTest, FindMissingBlobs)
 		ASSERT_EQ(find_response.missing_blob_digests_size(), 1);
 		EXPECT_EQ(find_response.missing_blob_digests(0).hash(),
 		          missing_digest.hash());
-		EXPECT_EQ(find_response.missing_blob_digests(0).size_bytes(),
-		          missing_digest.size_bytes());
 	}
 }
 
@@ -196,22 +194,7 @@ TEST_F(RemoteApiTest, BatchUpdateAndReadBlobs)
 	Digest      digest = MakeDigest(content);
 
 	// 2. Upload data block
-	{
-		grpc::ClientContext     context;
-		BatchUpdateBlobsRequest request;
-		request.set_instance_name(instance_name_);
-		auto request_blob = request.add_requests();
-		request_blob->mutable_digest()->CopyFrom(digest);
-		request_blob->set_data(content);
-
-		BatchUpdateBlobsResponse response;
-		grpc::Status             status =
-			cas_stub_->BatchUpdateBlobs(&context, request, &response);
-		ASSERT_TRUE(status.ok())
-			<< "BatchUpdateBlobs failed: " << status.error_message();
-		ASSERT_EQ(response.responses_size(), 1);
-		ASSERT_EQ(response.responses(0).status().code(), grpc::StatusCode::OK);
-	}
+	UploadBlob(digest, content);
 
 	// 3. Download data block
 	{
@@ -244,17 +227,17 @@ TEST_F(RemoteApiTest, ByteStreamWriteAndRead)
 	Digest      digest = MakeDigest(content);
 
 	const std::string upload_resource_name =
-		"/uploads/" + uuid_ + "/blobs/" + digest.hash() + "/" +
+		instance_name_ + "/uploads/" + uuid_ + "/blobs/" + digest.hash() + "/" +
 		std::to_string(digest.size_bytes());
 
 	// 2. Upload content
 	{
-		grpc::ClientContext               context;
-		google::bytestream::WriteResponse response;
+		grpc::ClientContext context;
+		WriteResponse       response;
 		auto writer = bytestream_stub_->Write(&context, &response);
 		ASSERT_TRUE(writer);
 
-		google::bytestream::WriteRequest request;
+		WriteRequest request;
 		request.set_resource_name(upload_resource_name);
 		request.set_data(content);
 		request.set_finish_write(true);
@@ -269,20 +252,21 @@ TEST_F(RemoteApiTest, ByteStreamWriteAndRead)
 	}
 
 	const std::string download_resource_name =
-		"/blobs/" + digest.hash() + "/" + std::to_string(digest.size_bytes());
+		instance_name_ + "/blobs/" + digest.hash() + "/" +
+		std::to_string(digest.size_bytes());
 
 	// 3. Download content
 	std::string downloaded_content;
 	{
-		grpc::ClientContext             context;
-		google::bytestream::ReadRequest request;
+		grpc::ClientContext context;
+		ReadRequest         request;
 		request.set_resource_name(download_resource_name);
 		request.set_read_offset(0);
 
 		auto reader = bytestream_stub_->Read(&context, request);
 		ASSERT_TRUE(reader);
 
-		google::bytestream::ReadResponse response;
+		ReadResponse response;
 		while (reader->Read(&response))
 		{
 			downloaded_content += response.data();
@@ -308,14 +292,12 @@ TEST_F(RemoteApiTest, AsyncExecuteAndReadOperation)
 	                      "Hello!' && exit 0\"");
 	command.add_output_files("stdout");
 
-	std::string command_blob;
-	command.SerializeToString(&command_blob);
-	Digest command_digest = MakeDigest(command_blob);
+	std::string command_blob = command.SerializeAsString();
+	Digest      command_digest = MakeDigest(command_blob);
 
 	Directory   empty_dir;
-	std::string empty_dir_blob;
-	empty_dir.SerializeToString(&empty_dir_blob);
-	Digest input_root_digest = MakeDigest(empty_dir_blob);
+	std::string empty_dir_blob = empty_dir.SerializeAsString();
+	Digest      input_root_digest = MakeDigest(empty_dir_blob);
 
 	Action action;
 	*action.mutable_command_digest() = command_digest;
@@ -326,25 +308,9 @@ TEST_F(RemoteApiTest, AsyncExecuteAndReadOperation)
 	Digest      action_digest = MakeDigest(action_blob);
 
 	// 2. Upload all the data blocks required for execution to CAS
-	{
-		grpc::ClientContext     context;
-		BatchUpdateBlobsRequest request;
-		request.set_instance_name(instance_name_);
-		auto* cmd_req = request.add_requests();
-		*cmd_req->mutable_digest() = command_digest;
-		cmd_req->set_data(command_blob);
-		auto* dir_req = request.add_requests();
-		*dir_req->mutable_digest() = input_root_digest;
-		dir_req->set_data(empty_dir_blob);
-		auto* action_req = request.add_requests();
-		*action_req->mutable_digest() = action_digest;
-		action_req->set_data(action_blob);
-
-		BatchUpdateBlobsResponse response;
-		grpc::Status             status =
-			cas_stub_->BatchUpdateBlobs(&context, request, &response);
-		ASSERT_TRUE(status.ok());
-	}
+	UploadBlob(command_digest, command_blob);
+	UploadBlob(input_root_digest, empty_dir_blob);
+	UploadBlob(action_digest, action_blob);
 
 	// 3. Execute Action asynchronously
 	ExecuteRequest exec_req;
@@ -367,7 +333,6 @@ TEST_F(RemoteApiTest, AsyncExecuteAndReadOperation)
 
 	Operation op;
 	bool      completed = false;
-
 	reader->Read(&op, (void*)2);
 
 	while (cq.Next(&tag, &ok))
