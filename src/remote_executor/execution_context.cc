@@ -163,8 +163,8 @@ void BuildMerkleTree(const std::set<std::string>& deps, const std::string& cwd,
     NestedDirectory* nested_dir, DigestStringMap* digest_files) {
   for (auto& dep : deps) {
     std::string merklePath(dep);
-    if (merklePath[0] != '/' && !cwd.empty())
-      merklePath = cwd + "/" + merklePath;
+    // if (merklePath[0] != '/' && !cwd.empty())
+    //   merklePath = cwd + "/" + merklePath;
     merklePath = StaticFileUtils::NormalizePath(merklePath.c_str());
     if (merklePath[0] == '/' &&
         !StaticFileUtils::HasPathPrefix(merklePath,
@@ -346,6 +346,33 @@ ConnectionOptions GetConnectOptions() {
 
 void ExecutionContext::Execute(int fd, RemoteExecutor::RemoteSpawn* spawn,
                               int& exit_code) {
+  std::string command = spawn->edge->EvaluateCommand();
+  std::string rule = spawn->edge->rule().name();
+  bool can_cache = RemoteExecutor::RemoteSpawn::CanCacheRemotelly(spawn->edge);
+  if (!can_cache) {
+    std::cout << "[LOG] local rule: " << rule << ", command: " << command << std::endl;
+    // Execute locally
+    SubprocessSet subprocset;
+    Subprocess* subproc = subprocset.Add(spawn->command);
+    if (!subproc) {
+      Fatal("Error while `Execute locally and Update to ActionCache`"); 
+    }    
+    //wait for local run finished
+    subproc = NULL;
+    while ((subproc = subprocset.NextFinished()) == NULL) {
+      bool interrupted = subprocset.DoWork();
+      if (interrupted)
+        return;
+    }
+    if (subproc->Finish() == ExitSuccess) {
+      // Warning("Execute locally: %s", subproc->GetOutput().c_str());
+    }
+    delete subproc;
+    exit_code = 0;
+    close(fd);
+    return;
+  }
+
   const std::string cwd = spawn->config->rbe_config.cwd;
   DigestStringMap blobs, digest_files;
   std::set<std::string> products;
