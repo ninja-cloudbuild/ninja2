@@ -16,6 +16,7 @@
 #define NINJA_REMOTEEXECUTOR_EXECUTIONCONTEXT_H
 
 #include "cas_client.h"
+#include "remote_spawn.h"
 
 namespace RemoteExecutor {
 

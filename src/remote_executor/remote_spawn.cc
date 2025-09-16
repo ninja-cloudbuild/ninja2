@@ -26,14 +26,17 @@ const BuildConfig* RemoteSpawn::config = nullptr;
 RemoteSpawn* RemoteSpawn::CreateRemoteSpawn(Edge* edge) {
   RemoteSpawn* spawn = new RemoteSpawn(edge, CanExecuteRemotelly(edge));
   std::string command = edge->EvaluateCommand();
+  std::string rule = edge->rule().name();
   spawn->origin_command = command;
   spawn->command = command;
   spawn->arguments = std::move(SplitStrings(command));
 
-  for (std::size_t i = 0; i < edge->inputs_.size(); i++) {
-    auto& cur_input = edge->inputs_[i]->path();
-    if (!edge->is_order_only(i))
-      spawn->inputs.emplace_back(cur_input);
+  if (rule.find("stamp") == std::string::npos){
+    for (std::size_t i = 0; i < edge->inputs_.size(); i++) {
+      auto& cur_input = edge->inputs_[i]->path();
+      if (!edge->is_order_only(i))
+        spawn->inputs.emplace_back(cur_input);
+    }
   }
   for (auto out_node : edge->outputs_)
     spawn->outputs.emplace_back(out_node->path());
@@ -58,18 +61,126 @@ std::vector<std::string> RemoteSpawn::GetHeaderFiles() {
   if (res.empty()) {
     Warning("command [%s] get headerfiles fail", origin_command.c_str());
   }
+  CleanCommand();
   return res;
+}
+
+void RemoteSpawn::CleanCommand() {
+  std::string command = origin_command;
+  if(command.find("\\") == std::string::npos) {
+    return;
+  }
+  if(command.find("__memcpy_arm") != std::string::npos ||
+    command.find("DAAMS_LOG_TAG") != std::string::npos ||
+    command.find("DABILITYBASE_LOG_TAG") != std::string::npos ||
+    command.find("DAPP_LOG_TAG") != std::string::npos ||
+    command.find("DHUKS_HAP_TRUST_LIST") != std::string::npos ||
+    command.find("drivers/peripheral/sensor/hal/") != std::string::npos ||
+    command.find("DAPI_EXPORT=__attribute__") != std::string::npos ||
+    command.find("DNETMGR_LOG_TAG") != std::string::npos ||
+    command.find("\\ =\\ ") != std::string::npos ) {
+    std::string cleaned;
+    cleaned.reserve(command.size());
+    for (size_t i = 0; i < command.size(); ++i) {
+      if (command[i] == '\\') {
+        if (i + 1 < command.size() && (command[i + 1] == ' ')) {
+          ++i;
+        }
+        continue;
+      }
+      cleaned += command[i];
+    }
+    command = cleaned;
+
+    this->origin_command = command;
+    this->command = command;
+    this->arguments = std::move(SplitStrings(command));
+
+    return;
+  }
+
+  if(command.find("-DSYSCONFDIR=") != std::string::npos) {
+    std::string cleaned;
+    int len = command.size();
+    cleaned.reserve(command.size());
+    for (size_t i = 0; i < len; ++i) {
+      if (i + 3 < len &&
+        command[i] == '\\' && 
+        command[i+1] == '\\' && 
+        command[i+2] == '\\' && 
+        command[i+3] == '"') {
+        i += 3;
+        continue;
+      } else if (command[i] == '\\') {
+        continue;
+      } else {
+        cleaned += command[i];
+      }
+    }
+    command = cleaned;
+
+    this->origin_command = command;
+    this->command = command;
+    this->arguments = std::move(SplitStrings(command));
+    return;
+  }
+
+  std::string cleaned;
+  cleaned.reserve(command.size());
+  for (size_t i = 0; i < command.size(); ++i) {
+    if (command[i] == '\\') {
+      continue;
+    }
+    cleaned += command[i];
+  }
+  command = cleaned;
+
+  this->origin_command = command;
+  this->command = command;
+  this->arguments = std::move(SplitStrings(command));
 }
 
 bool RemoteSpawn::CanExecuteRemotelly(Edge* edge) {
   if (!edge)
     return false;
-  if(edge->rule().name().substr(0,14)=="CXX_COMPILER__") return true;
-    return false;
   std::string command = edge->EvaluateCommand();
+  std::string rule = edge->rule().name();
+  if (rule == "stamp") return true;
+  if (rule == "copy") return false;
+  for (auto& it : CompileCommandParser::UnSupportedRemoteExecuteRules())
+    if (rule.find(it) != std::string::npos)
+      return false;
+
+  if(rule.substr(0,14)=="CXX_COMPILER__") return true;
+    // return false;
+  for (auto& it : CompileCommandParser::UnSupportedRemoteExecuteCommands())
+    if (command.find(it) != std::string::npos)
+      return false;
   for (auto& it : CompileCommandParser::SupportedRemoteExecuteCommands())
     if (command.find(it) != std::string::npos)
       return true;
+  return false;
+}
+
+bool RemoteSpawn::CanCacheRemotelly(Edge* edge) {
+  if (!edge)
+    return false;
+  std::string command = edge->EvaluateCommand();
+  std::string rule = edge->rule().name();
+
+  if (rule == "stamp") return true;
+  if (rule == "copy") return false;
+  for (auto& it : CompileCommandParser::UnSupportedRemoteExecuteRules())
+    if (rule.find(it) != std::string::npos)
+      return false;
+  for (auto& it : CompileCommandParser::UnSupportedRemoteExecuteCommands())
+    if (command.find(it) != std::string::npos)
+      return false;
+
+  for (auto& it : CompileCommandParser::SupportedRemoteExecuteCommands())
+    if (command.find(it) != std::string::npos)
+      return true;
+  
   return false;
 }
 

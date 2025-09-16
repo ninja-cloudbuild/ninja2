@@ -29,8 +29,10 @@ namespace RemoteExecutor {
 struct RemoteSpawn {
   static RemoteSpawn* CreateRemoteSpawn(Edge* edge);
   static bool CanExecuteRemotelly(Edge* edge);
+  static bool CanCacheRemotelly(Edge* edge);
 
   std::vector<std::string> GetHeaderFiles();
+  void CleanCommand();
   void ConvertAllPathToRelative();
 
   static const BuildConfig* config;
