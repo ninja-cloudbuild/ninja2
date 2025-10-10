@@ -50,8 +50,6 @@ struct CompileCommandParser {
   static ParseResult ParseCommand(const std::vector<std::string>& command);
   static std::set<std::string> ParseHeaders(const ParseResult& result);
   static const std::set<std::string>& SupportedRemoteExecuteCommands();
-  static const std::set<std::string>& UnSupportedRemoteExecuteRules();
-  static const std::set<std::string>& UnSupportedRemoteExecuteCommands();
 };
 
 } //namespace RemoteExecutor

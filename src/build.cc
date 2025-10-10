@@ -833,18 +833,6 @@ bool CloudCommandRunner::StartCommand(Edge* edge) {
   string command = edge->EvaluateCommand();
   auto spawn = RemoteExecutor::RemoteSpawn::CreateRemoteSpawn(edge);
   string cmd_rule =spawn->edge->rule().name();
-  if(config_.rbe_config.local_only_rules.find(cmd_rule) != config_.rbe_config.local_only_rules.end()){
-    SubprocessSet subprocset;
-    Subprocess* subproc = subprocset.Add(spawn->command,edge->use_console());
-    return subproc != nullptr;
-  }
-  for(auto &cmd:config_.rbe_config.fuzzy_rules){
-    if(cmd.find(cmd_rule)!=std::string::npos){
-    SubprocessSet subprocset;
-    Subprocess* subproc = subprocset.Add(spawn->command,edge->use_console());
-    return subproc != nullptr;
-    }
-  }
   RemoteProcess* remoteproc = remote_procs_.Add(spawn);
   if (!remoteproc)
     return false;

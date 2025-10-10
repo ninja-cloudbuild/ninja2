@@ -146,16 +146,16 @@ bool RemoteSpawn::CanExecuteRemotelly(Edge* edge) {
   std::string command = edge->EvaluateCommand();
   std::string rule = edge->rule().name();
   if (rule == "stamp") return true;
-  if (rule == "copy") return false;
-  for (auto& it : CompileCommandParser::UnSupportedRemoteExecuteRules())
-    if (rule.find(it) != std::string::npos)
+  if (config->rbe_config.local_only_rules.find(rule) != config->rbe_config.local_only_rules.end()){
+    return false;
+  }
+  for (auto &cmd : config->rbe_config.fuzzy_rules){
+    if(command.find(cmd)!=std::string::npos || rule.find(cmd)!=std::string::npos){
       return false;
-
-  if(rule.substr(0,14)=="CXX_COMPILER__") return true;
-    // return false;
-  for (auto& it : CompileCommandParser::UnSupportedRemoteExecuteCommands())
-    if (command.find(it) != std::string::npos)
-      return false;
+    }
+  }
+  if (rule.substr(0,14)=="CXX_COMPILER__") return true;
+  // return false;
   for (auto& it : CompileCommandParser::SupportedRemoteExecuteCommands())
     if (command.find(it) != std::string::npos)
       return true;
@@ -169,13 +169,14 @@ bool RemoteSpawn::CanCacheRemotelly(Edge* edge) {
   std::string rule = edge->rule().name();
 
   if (rule == "stamp") return true;
-  if (rule == "copy") return false;
-  for (auto& it : CompileCommandParser::UnSupportedRemoteExecuteRules())
-    if (rule.find(it) != std::string::npos)
+  if(config->rbe_config.local_only_rules.find(rule) != config->rbe_config.local_only_rules.end()){
+    return false;
+  }
+  for(auto &cmd:config->rbe_config.fuzzy_rules){
+    if(command.find(cmd)!=std::string::npos || rule.find(cmd)!=std::string::npos){
       return false;
-  for (auto& it : CompileCommandParser::UnSupportedRemoteExecuteCommands())
-    if (command.find(it) != std::string::npos)
-      return false;
+    }
+  }
 
   for (auto& it : CompileCommandParser::SupportedRemoteExecuteCommands())
     if (command.find(it) != std::string::npos)
