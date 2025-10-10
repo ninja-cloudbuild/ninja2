@@ -1633,6 +1633,7 @@ NORETURN void real_main(int argc, char** argv) {
     if (!config.rbe_config.project_root.empty()) {
       project_root = config.rbe_config.project_root;
     }
+    load_command_file(project_root, config);
     load_devcontainer_config(project_root, config);
     printf("----------------------CloudBuild/ShareBuild Mode Info----------------------\n");
     if(config.cloud_run){

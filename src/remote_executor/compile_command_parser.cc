@@ -40,8 +40,6 @@ struct SupportedCompilers {
 
   static const StringSet GccSupportedLanguages;
   static const StringSet SupportedRemoteExecuteCommands;
-  static const StringSet UnSupportedRemoteExecuteRules;
-  static const StringSet UnSupportedRemoteExecuteCommands;
 };
 
 const StringSet SupportedCompilers::GccCompilers
@@ -64,15 +62,6 @@ const StringSet SupportedCompilers::GccSupportedLanguages
       "c++-user-header" };
 const StringSet SupportedCompilers::SupportedRemoteExecuteCommands
   = { "gcc ", "g++ ", "c++ ", "clang ", "clang++ ", "javac " };
-
-const StringSet SupportedCompilers::UnSupportedRemoteExecuteRules
-  = { "C_COMPILER__cmTC_", "C_EXECUTABLE_LINKER__cmTC_", "CXX_COMPILER__cmTC_", "CXX_EXECUTABLE_LINKER__cmTC_", 
-      "build_toolchain_ohos_ohos_clang_arm__rule", "build_toolchain_linux_clang_x64__rule", "build_toolchain_mingw_mingw_x86_64__rule", 
-      "CXX_COMPILER__LumeShaderCompiler", "CXX_EXECUTABLE_LINKER__LumeShaderCompiler", "CXX_COMPILER__SPIRV-Tools-shared", "CXX_SHARED_LIBRARY_LINKER__SPIRV-Tools-shared", "CXX_COMPILER__SPIRV-Tools-static", "CXX_STATIC_LIBRARY_LINKER__SPIRV-Tools-static", "CXX_COMPILER__SPIRV-Tools-opt", "CXX_STATIC_LIBRARY_LINKER__SPIRV-Tools-opt", "CXX_COMPILER__SPIRV-Tools-reduce", "CXX_STATIC_LIBRARY_LINKER__SPIRV-Tools-reduce", "CXX_COMPILER__SPIRV-Tools-link", "CXX_STATIC_LIBRARY_LINKER__SPIRV-Tools-link", "CXX_COMPILER__SPIRV-Tools-lint", "CXX_STATIC_LIBRARY_LINKER__SPIRV-Tools-lint", "CXX_COMPILER__SPIRV-Tools-diff", "CXX_STATIC_LIBRARY_LINKER__SPIRV-Tools-diff", "CXX_COMPILER__GenericCodeGen", "CXX_STATIC_LIBRARY_LINKER__GenericCodeGen", "CXX_COMPILER__MachineIndependent", "CXX_STATIC_LIBRARY_LINKER__MachineIndependent", "CXX_COMPILER__glslang", "CXX_STATIC_LIBRARY_LINKER__glslang", "CXX_COMPILER__OSDependent", "CXX_STATIC_LIBRARY_LINKER__OSDependent", "CXX_COMPILER__OGLCompiler", "CXX_STATIC_LIBRARY_LINKER__OGLCompiler", "CXX_COMPILER__SPIRV", "CXX_STATIC_LIBRARY_LINKER__SPIRV", "CXX_COMPILER__spirv-cross-glsl", "CXX_STATIC_LIBRARY_LINKER__spirv-cross-glsl", "CXX_COMPILER__spirv-cross-core", "CXX_STATIC_LIBRARY_LINKER__spirv-cross-core", "CXX_COMPILER__LumeAssetCompiler", "CXX_EXECUTABLE_LINKER__LumeAssetCompiler", "RERUN_CMAKE", "CLEAN", "HELP",
-      "solink", "link", };
-const StringSet SupportedCompilers::UnSupportedRemoteExecuteCommands
-  = { "asm_defines/asm_defines/defines", "soft_musl_crt/crti", "FREETYPE_MINOR", "-DACE_LOG_TAG=\\\"Ace\\\"", "compiler/optimizer/code_generator/target", "build/toolchain/rustc_wrapper.py", 
-      "QuickFixService", "BundleTool", "render_service_base/rs_base_blocklist", "render_service_client/rs_client_blocklist"};
 
 struct CompilerListHasher {
   size_t operator()(const StringSet& compiler_list) const {
@@ -443,12 +432,6 @@ StringSet CompileCommandParser::ParseHeaders(const ParseResult& result) {
 
 const StringSet& CompileCommandParser::SupportedRemoteExecuteCommands() {
   return SupportedCompilers::SupportedRemoteExecuteCommands;
-}
-const StringSet& CompileCommandParser::UnSupportedRemoteExecuteRules() {
-  return SupportedCompilers::UnSupportedRemoteExecuteRules;
-}
-const StringSet& CompileCommandParser::UnSupportedRemoteExecuteCommands() {
-  return SupportedCompilers::UnSupportedRemoteExecuteCommands;
 }
 
 std::pair<std::string, ParseFunc> ParseRuleHelper::MatchCompilerOptions(

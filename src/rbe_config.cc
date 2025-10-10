@@ -90,10 +90,10 @@ void load_devcontainer_config(const std::string& project_root, BuildConfig &conf
     }  
 } 
 
-const std::string COMMANDFILE ="/command_cloudbuild.yml";
+const std::string COMMANDFILE ="../.cloudbuild.yml";
 
 void load_command_file(const std::string& project_root, BuildConfig &config){
-   std::string commandFilePath=project_root+COMMANDFILE;
+    std::string commandFilePath=project_root+COMMANDFILE;
     std::ifstream file(commandFilePath);  
     YAML::Node  command_set;
     if (file.is_open()){
@@ -110,12 +110,12 @@ void load_command_file(const std::string& project_root, BuildConfig &config){
         }
         if (command_set["commands"]["remote_no_cache"]) {
             for (const auto& cmd : command_set["commands"]["remote_no_cache"]) {
-                 config.rbe_config.remote_no_cache_rules.insert(cmd.as<std::string>());
+                config.rbe_config.remote_no_cache_rules.insert(cmd.as<std::string>());
             }
         }
          if (command_set["commands"]["fuzzy_rule"]) {
             for (const auto& cmd : command_set["commands"]["fuzzy_rule"]) {
-                 config.rbe_config.fuzzy_rules.insert(cmd.as<std::string>());
+                config.rbe_config.fuzzy_rules.insert(cmd.as<std::string>());
             }
         }
 

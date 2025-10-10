@@ -350,7 +350,6 @@ void ExecutionContext::Execute(int fd, RemoteExecutor::RemoteSpawn* spawn,
   std::string rule = spawn->edge->rule().name();
   bool can_cache = RemoteExecutor::RemoteSpawn::CanCacheRemotelly(spawn->edge);
   if (!can_cache) {
-    std::cout << "[LOG] local rule: " << rule << ", command: " << command << std::endl;
     // Execute locally
     SubprocessSet subprocset;
     Subprocess* subproc = subprocset.Add(spawn->command);
