@@ -26,16 +26,40 @@
 std::string get_ipv4_address(size_t address_size);
 
 bool load_config_file(BuildConfig &config) {
-  // 设置默认值 
-  config.cloud_run = false;
-  config.share_run = false;
-  // zero config: `localhost:50051` as default sharebuild proxy address
-  config.rbe_config.shareproxy_addr = "localhost:50051";
-  config.rbe_config.self_ipv4_addr = get_ipv4_address(INET_ADDRSTRLEN);
-  config.rbe_config.grpc_url = "";
-  
-  // 尝试加载配置文件并覆盖默认值
-  std::string config_file = "/etc/ninja2.conf";
+    // 设置默认值 
+    config.cloud_run = false;
+    config.share_run = false;
+    // zero config: `localhost:50051` as default sharebuild proxy address
+    config.rbe_config.shareproxy_addr = "localhost:50051";
+    config.rbe_config.self_ipv4_addr = get_ipv4_address(INET_ADDRSTRLEN);
+    config.rbe_config.grpc_url = "";
+    
+    // 尝试加载配置文件并覆盖默认值
+    std::string config_file = ".ninja2.conf";
+    std::ifstream file(config_file);  
+    if (file.is_open()) {
+        #ifdef ENABLE_CONFIG_LOG
+            std::cout << "Found " << config_file << " in working dir.\n";
+        #endif
+        file.close(); // 记得关闭文件
+    } else {
+        const char* home_dir = std::getenv("HOME");  
+        if (home_dir == nullptr) {  
+            std::cerr << "Error: HOME environment variable not set.\n";
+            exit(-1);
+            return false;  
+        }  
+    
+        config_file = std::string(home_dir) + "/" + config_file;  
+        std::ifstream file(config_file);  
+    
+        if (file.is_open()) {  
+            std::cout << "Found " << config_file << " in home dir.\n";
+            file.close(); // 记得关闭文件  
+        } else {    
+            return false;
+        }
+    }
     try {
         YAML::Node ninja2_conf = YAML::LoadFile(config_file);
         
