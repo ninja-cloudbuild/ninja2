@@ -114,7 +114,7 @@ void load_devcontainer_config(const std::string& project_root, BuildConfig &conf
     }  
 } 
 
-const std::string COMMANDFILE ="../.cloudbuild.yml";
+const std::string COMMANDFILE ="/.cloudbuild.yml";
 
 void load_command_file(const std::string& project_root, BuildConfig &config){
     std::string commandFilePath=project_root+COMMANDFILE;
