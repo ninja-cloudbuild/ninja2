@@ -171,10 +171,8 @@ mount -a
 3.1 ninja2
 
 ```sh
-git clone https://github.com/leonardxc/ninja2.git
-# 或者ninja2 openharmony分支
+git clone git@github.com:ninja-cloudbuild/ninja2.git
 cd ninja2
-git checkout openharmony
 ./build.sh build
 ```
 
@@ -184,9 +182,7 @@ git checkout openharmony
 # 将 .ninja2.conf 复制到$HOME目录中
 cloud_build: true
 grpc_url: "grpc://localhost:1985"  
-share_build: false  
-master_addr: "/.../OpenHarmony-v4.1-Release/OpenHarmony"
-self_ipv4_address: ""
+share_build: false
 ```
 
 3.3 .cloudbuild.yml
@@ -203,5 +199,5 @@ self_ipv4_address: ""
 rm prebuilts/build-tools/linux-x86/bin/ninja
 ll prebuilts/build-tools/linux-x86/bin/ninja
 cp /.../ninja2/build/bin/ninja prebuilts/build-tools/linux-x86/bin/
-./build.sh --product-name rk3568 --ccache=false
+./build.sh --product-name rk3568 --ccache=false --ninja-args="-r/.../OpenHarmony-v4.1-Release/OpenHarmony"
 ```
