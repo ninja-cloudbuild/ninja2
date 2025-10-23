@@ -351,7 +351,6 @@ void ExecutionContext::Execute(int fd, RemoteExecutor::RemoteSpawn* spawn,
   bool can_cache = RemoteExecutor::RemoteSpawn::CanCacheRemotelly(spawn->edge);
   if (!can_cache) {
     // Execute locally
-    // std::cout << "[LOG] Execute local rule: " << rule << ", command " << command << std::endl;
     SubprocessSet subprocset;
     Subprocess* subproc = subprocset.Add(spawn->command);
     if (!subproc) {
@@ -402,7 +401,7 @@ void ExecutionContext::Execute(int fd, RemoteExecutor::RemoteSpawn* spawn,
   bool cached = false;
   ActionResult result;
   cached = re_client.FetchFromActionCache(action_digest, products, &result);
-   Warning("Execute locally CMD: %s,is it cached? %d", spawn->command.c_str(),cached);
+  // Warning("Execute locally CMD: %s,is it cached? %d", spawn->command.c_str(),cached);
   if(cached) 
     exit_code = result.exit_code();
   // Info("action cached is %d", cached);
@@ -413,7 +412,6 @@ void ExecutionContext::Execute(int fd, RemoteExecutor::RemoteSpawn* spawn,
   // spawn->work.remote = false; 时，只能本地执行
   // spawn->work.remote = false;
   if (!cached && !spawn->can_remote) {
-    // std::cout << "[LOG] Execute local2 rule: " << rule << ", command " << command << std::endl;
     // Execute locally
     SubprocessSet subprocset;
     Subprocess* subproc = subprocset.Add(spawn->command);
@@ -433,12 +431,12 @@ void ExecutionContext::Execute(int fd, RemoteExecutor::RemoteSpawn* spawn,
     delete subproc;
 
     DigestStringMap outblobs, outputs_digest_files;
-     bool ret = BuildActionOutputs(spawn, cwd, &outblobs, &outputs_digest_files, &result);
-      if(!ret){
-        exit_code = 0;
-        close(fd);
-        return;
-      }
+    bool ret = BuildActionOutputs(spawn, cwd, &outblobs, &outputs_digest_files, &result);
+    if(!ret){
+      exit_code = 0;
+      close(fd);
+      return;
+    }
     outblobs[action_digest] = action.SerializeAsString();
     try {
       // 上传文件至 CAS cache
@@ -461,7 +459,6 @@ void ExecutionContext::Execute(int fd, RemoteExecutor::RemoteSpawn* spawn,
 
   // remote 执行
   if (!cached && spawn->can_remote) {
-      // std::cout << "[LOG] Execute remote rule: " << rule << ", command " << command << std::endl;
       blobs[action_digest] = action.SerializeAsString();
       UploadResources(&cas_client, blobs, digest_files);
       result = re_client.ExecuteAction(action_digest, *stop_requested_, false);

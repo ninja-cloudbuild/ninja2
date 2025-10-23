@@ -121,12 +121,12 @@ void load_command_file(const std::string& project_root, BuildConfig &config){
     std::ifstream file(commandFilePath);  
     YAML::Node  command_set;
     if (file.is_open()){
-      command_set = YAML::LoadFile(commandFilePath);
-        } else {
-            std::cout << "YAML file not found,no filter command.\n";
-            return;
-        }
-     if (command_set) {
+        command_set = YAML::LoadFile(commandFilePath);
+    } else {
+        std::cout << "YAML file not found,no filter command.\n";
+        return;
+    }
+    if (command_set) {
         if (command_set["commands"]["local_only"]) {
             for (const auto& cmd : command_set["commands"]["local_only"]) {
                 config.rbe_config.local_only_rules.insert(cmd.as<std::string>());
@@ -137,7 +137,7 @@ void load_command_file(const std::string& project_root, BuildConfig &config){
                 config.rbe_config.remote_no_cache_rules.insert(cmd.as<std::string>());
             }
         }
-         if (command_set["commands"]["fuzzy_rule"]) {
+        if (command_set["commands"]["fuzzy_rule"]) {
             for (const auto& cmd : command_set["commands"]["fuzzy_rule"]) {
                 config.rbe_config.fuzzy_rules.insert(cmd.as<std::string>());
             }
