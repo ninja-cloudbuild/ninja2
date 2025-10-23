@@ -70,71 +70,21 @@ void RemoteSpawn::CleanCommand() {
   if(command.find("\\") == std::string::npos) {
     return;
   }
-  if(command.find("__memcpy_arm") != std::string::npos ||
-    command.find("DAAMS_LOG_TAG") != std::string::npos ||
-    command.find("DABILITYBASE_LOG_TAG") != std::string::npos ||
-    command.find("DAPP_LOG_TAG") != std::string::npos ||
-    command.find("DHUKS_HAP_TRUST_LIST") != std::string::npos ||
-    command.find("drivers/peripheral/sensor/hal/") != std::string::npos ||
-    command.find("DAPI_EXPORT=__attribute__") != std::string::npos ||
-    command.find("DNETMGR_LOG_TAG") != std::string::npos ||
-    command.find("\\ =\\ ") != std::string::npos ) {
-    std::string cleaned;
-    cleaned.reserve(command.size());
-    for (size_t i = 0; i < command.size(); ++i) {
-      if (command[i] == '\\') {
-        if (i + 1 < command.size() && (command[i + 1] == ' ')) {
-          ++i;
-        }
-        continue;
-      }
-      cleaned += command[i];
-    }
-    command = cleaned;
-
-    this->origin_command = command;
-    this->command = command;
-    this->arguments = std::move(SplitStrings(command));
-
-    return;
-  }
-
-  if(command.find("-DSYSCONFDIR=") != std::string::npos) {
-    std::string cleaned;
-    int len = command.size();
-    cleaned.reserve(command.size());
-    for (size_t i = 0; i < len; ++i) {
-      if (i + 3 < len &&
-        command[i] == '\\' && 
-        command[i+1] == '\\' && 
-        command[i+2] == '\\' && 
-        command[i+3] == '"') {
-        i += 3;
-        continue;
-      } else if (command[i] == '\\') {
-        continue;
-      } else {
-        cleaned += command[i];
-      }
-    }
-    command = cleaned;
-
-    this->origin_command = command;
-    this->command = command;
-    this->arguments = std::move(SplitStrings(command));
-    return;
-  }
-
   std::string cleaned;
+  int len = command.size();
   cleaned.reserve(command.size());
-  for (size_t i = 0; i < command.size(); ++i) {
+  for (size_t i = 0; i < len; ++i) {
     if (command[i] == '\\') {
+      if (i + 1 < len && (command[i + 1] == ' ')) {
+        ++i;
+      } else if(i + 3 < len && command[i+1] == '\\' && command[i+2] == '\\' && command[i+3] == '"') {
+        i+=3;
+      }
       continue;
     }
     cleaned += command[i];
   }
   command = cleaned;
-
   this->origin_command = command;
   this->command = command;
   this->arguments = std::move(SplitStrings(command));
@@ -145,7 +95,7 @@ bool RemoteSpawn::CanExecuteRemotelly(Edge* edge) {
     return false;
   std::string command = edge->EvaluateCommand();
   std::string rule = edge->rule().name();
-  if (rule == "stamp") return true;
+  
   if (config->rbe_config.local_only_rules.find(rule) != config->rbe_config.local_only_rules.end()){
     return false;
   }
@@ -154,6 +104,7 @@ bool RemoteSpawn::CanExecuteRemotelly(Edge* edge) {
       return false;
     }
   }
+  if (rule.find("stamp") != std::string::npos) return true;
   if (rule.substr(0,14)=="CXX_COMPILER__") return true;
   // return false;
   for (auto& it : CompileCommandParser::SupportedRemoteExecuteCommands())
@@ -168,16 +119,16 @@ bool RemoteSpawn::CanCacheRemotelly(Edge* edge) {
   std::string command = edge->EvaluateCommand();
   std::string rule = edge->rule().name();
 
-  if (rule == "stamp") return true;
-  if(config->rbe_config.local_only_rules.find(rule) != config->rbe_config.local_only_rules.end()){
+  if (config->rbe_config.local_only_rules.find(rule) != config->rbe_config.local_only_rules.end()){
     return false;
   }
-  for(auto &cmd:config->rbe_config.fuzzy_rules){
-    if(command.find(cmd)!=std::string::npos || rule.find(cmd)!=std::string::npos){
+  for (auto &cmd:config->rbe_config.fuzzy_rules){
+    if (command.find(cmd)!=std::string::npos || rule.find(cmd)!=std::string::npos){
       return false;
     }
   }
-
+  
+  if (rule.find("stamp") != std::string::npos) return true;
   for (auto& it : CompileCommandParser::SupportedRemoteExecuteCommands())
     if (command.find(it) != std::string::npos)
       return true;
