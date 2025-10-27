@@ -41,7 +41,7 @@ jobs:
 
     # Upload ninja binary archive as an artifact  
     - name: Upload artifact  
-      uses: actions/upload-artifact@v4  
+      uses: actions/upload-artifact@v5  
       with:  
         name: ninja-binary-archives  
         path: artifact  
@@ -153,7 +153,7 @@ jobs:
 
   #   # Upload ninja binary archive as an artifact
   #   - name: Upload artifact
-  #     uses: actions/upload-artifact@v4
+  #     uses: actions/upload-artifact@v5
   #     with:
   #       name: ninja-binary-archives
   #       path: artifact
@@ -282,7 +282,7 @@ jobs:
 
   #   # Upload ninja binary archive as an artifact
   #   - name: Upload artifact
-  #     uses: actions/upload-artifact@v4
+  #     uses: actions/upload-artifact@v5
   #     with:
   #       name: ninja-aarch64-binary-archives
   #       path: artifact
