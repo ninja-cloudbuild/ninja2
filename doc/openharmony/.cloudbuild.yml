@@ -47,15 +47,6 @@ commands:
     - "rust_rlib"
     - "rust_staticlib"
     - "copy"
-    # - "clang_x64_solink"
-    # - "mingw_x86_64_solink"
-    # - "solink"
-    # - "alink"
-    # - "clang_x64_alink"
-    # - "clang_x64_link"
-    # - "link"
-    # - "mingw_x86_64_alink"
-    # - "mingw_x86_64_link"
   # 远程执行但不缓存的命令（如每次需重新拉取资源的命令）
   remote_no_cache:
   # 模糊匹配的命令（如包含特定关键词的编译命令）
@@ -78,8 +69,5 @@ commands:
     - "render_service_client/rs_client_blocklist"
     - "externals/libjpeg-turbo/libjpeg"
     - "externals/libjpeg-turbo/simd"
-    # - "libjpeg-turbo/libjpeg/jccolor"
-    # - "libjpeg-turbo/libjpeg/jchuff.o"
-    # - "libjpeg-turbo/libjpeg/jcphuff.o"
-    # - "libjpeg-turbo/libjpeg/jcsample.o"
-    
+    - "touch "
+

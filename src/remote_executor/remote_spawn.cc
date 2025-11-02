@@ -31,12 +31,10 @@ RemoteSpawn* RemoteSpawn::CreateRemoteSpawn(Edge* edge) {
   spawn->command = command;
   spawn->arguments = std::move(SplitStrings(command));
 
-  if (rule.find("stamp") == std::string::npos){
-    for (std::size_t i = 0; i < edge->inputs_.size(); i++) {
-      auto& cur_input = edge->inputs_[i]->path();
-      if (!edge->is_order_only(i))
-        spawn->inputs.emplace_back(cur_input);
-    }
+  for (std::size_t i = 0; i < edge->inputs_.size(); i++) {
+    auto& cur_input = edge->inputs_[i]->path();
+    if (!edge->is_order_only(i))
+      spawn->inputs.emplace_back(cur_input);
   }
   for (auto out_node : edge->outputs_)
     spawn->outputs.emplace_back(out_node->path());
@@ -104,9 +102,6 @@ bool RemoteSpawn::CanExecuteRemotelly(Edge* edge) {
       return false;
     }
   }
-  if (rule.find("stamp") != std::string::npos) return true;
-  if (rule.substr(0,14)=="CXX_COMPILER__") return true;
-  // return false;
   for (auto& it : CompileCommandParser::SupportedRemoteExecuteCommands())
     if (command.find(it) != std::string::npos)
       return true;
@@ -127,8 +122,6 @@ bool RemoteSpawn::CanCacheRemotelly(Edge* edge) {
       return false;
     }
   }
-  
-  if (rule.find("stamp") != std::string::npos) return true;
   for (auto& it : CompileCommandParser::SupportedRemoteExecuteCommands())
     if (command.find(it) != std::string::npos)
       return true;
