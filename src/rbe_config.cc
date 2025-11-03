@@ -114,35 +114,34 @@ void load_devcontainer_config(const std::string& project_root, BuildConfig &conf
     }  
 } 
 
-const std::string COMMANDFILE ="/.cloudbuild.yml";
+const std::string CLOUDBUILD_FILE_NAME ="/.cloudbuild.yml";
 
-void load_command_file(const std::string& project_root, BuildConfig &config){
-    std::string commandFilePath=project_root+COMMANDFILE;
-    std::ifstream file(commandFilePath);  
-    YAML::Node  command_set;
+void load_rules_file(const std::string& project_root, BuildConfig &config){
+    std::string FilePath = project_root + CLOUDBUILD_FILE_NAME;
+    std::ifstream file(FilePath);  
+    YAML::Node  rule_set;
     if (file.is_open()){
-        command_set = YAML::LoadFile(commandFilePath);
+        rule_set = YAML::LoadFile(FilePath);
     } else {
-        std::cout << "YAML file not found,no filter command.\n";
+        std::cout << "YAML file not found, no filter command.\n";
         return;
     }
-    if (command_set) {
-        if (command_set["commands"]["local_only"]) {
-            for (const auto& cmd : command_set["commands"]["local_only"]) {
+    if (rule_set) {
+        if (rule_set["rules"]["local_only_rules"]) {
+            for (const auto& cmd : rule_set["rules"]["local_only_rules"]) {
                 config.rbe_config.local_only_rules.insert(cmd.as<std::string>());
             }
         }
-        if (command_set["commands"]["remote_no_cache"]) {
-            for (const auto& cmd : command_set["commands"]["remote_no_cache"]) {
-                config.rbe_config.remote_no_cache_rules.insert(cmd.as<std::string>());
+        if (rule_set["rules"]["local_only_fuzzy"]) {
+            for (const auto& cmd : rule_set["rules"]["local_only_fuzzy"]) {
+                config.rbe_config.local_only_fuzzy.insert(cmd.as<std::string>());
             }
         }
-        if (command_set["commands"]["fuzzy_rule"]) {
-            for (const auto& cmd : command_set["commands"]["fuzzy_rule"]) {
-                config.rbe_config.fuzzy_rules.insert(cmd.as<std::string>());
+        if (rule_set["rules"]["remote_exec_rules"]) {
+            for (const auto& cmd : rule_set["rules"]["remote_exec_rules"]) {
+                config.rbe_config.remote_exec_rules.insert(cmd.as<std::string>());
             }
         }
-
     }
 }
 
