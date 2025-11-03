@@ -1,8 +1,8 @@
 # command_cloudbuild.yml
 # 作用：配置 RBE（远程构建执行）的命令规则
-commands:
-  # 本地仅执行的命令（如本地文件预处理、依赖检查）
-  local_only:
+rules:
+  # 仅本地仅执行的命令（如本地文件预处理、依赖检查）
+  local_only_rules:
     - "CXX_COMPILER__LumeShaderCompiler"
     - "CXX_COMPILER__LumeShaderCompiler"
     - "CXX_EXECUTABLE_LINKER__LumeShaderCompiler" 
@@ -48,9 +48,9 @@ commands:
     - "rust_staticlib"
     - "copy"
   # 远程执行但不缓存的命令（如每次需重新拉取资源的命令）
-  remote_no_cache:
+  remote_exec_rules:
   # 模糊匹配的命令（如包含特定关键词的编译命令）
-  fuzzy_rule:
+  local_only_fuzzy:
     - "build_toolchain_ohos_ohos_clang_arm__rule"
     - "build_toolchain_linux_clang_x64__rule"
     - "build_toolchain_mingw_mingw_x86_64__rule"
@@ -70,4 +70,4 @@ commands:
     - "externals/libjpeg-turbo/libjpeg"
     - "externals/libjpeg-turbo/simd"
     - "touch "
-
+    

@@ -180,8 +180,8 @@ struct ProjectConfig {
   std::string self_ipv4_addr;
   std::string grpc_url;
   std::set<std::string>  local_only_rules;
-  std::set<std::string>  remote_no_cache_rules;
-  std::set<std::string>  fuzzy_rules;
+  std::set<std::string>  local_only_fuzzy;
+  std::set<std::string>  remote_exec_rules;
 };
 /// Options (e.g. verbosity, parallelism) passed to a build.
 struct BuildConfig {

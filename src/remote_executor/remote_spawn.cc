@@ -97,7 +97,7 @@ bool RemoteSpawn::CanExecuteRemotelly(Edge* edge) {
   if (config->rbe_config.local_only_rules.find(rule) != config->rbe_config.local_only_rules.end()){
     return false;
   }
-  for (auto &cmd : config->rbe_config.fuzzy_rules){
+  for (auto &cmd : config->rbe_config.local_only_fuzzy){
     if(command.find(cmd)!=std::string::npos || rule.find(cmd)!=std::string::npos){
       return false;
     }
@@ -117,7 +117,7 @@ bool RemoteSpawn::CanCacheRemotelly(Edge* edge) {
   if (config->rbe_config.local_only_rules.find(rule) != config->rbe_config.local_only_rules.end()){
     return false;
   }
-  for (auto &cmd:config->rbe_config.fuzzy_rules){
+  for (auto &cmd:config->rbe_config.local_only_fuzzy){
     if (command.find(cmd)!=std::string::npos || rule.find(cmd)!=std::string::npos){
       return false;
     }
