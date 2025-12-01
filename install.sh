@@ -105,6 +105,7 @@ function install {
   local install_path="/usr/bin/ninja"
   local backup_path="/usr/bin/ninja.prev"
   local config_file="/etc/ninja2.conf"
+  local AOSP14_yml_file="/etc/ninja2/aosp14/.sharebuild.yml"
 
   local sharebuid_install_path="/usr/bin/sharebuild-server"
   local android_ninja_install_path="/usr/bin/android_ninja"
@@ -126,6 +127,9 @@ function install {
   if [ ! -f "$config_file" ]; then 
 	  sudo cp "ninja2/ninja2.conf" "$config_file"
   fi
+  # cp AOSP14 yml file
+  sudo cp "ninja2/.sharebuild.yml" "$AOSP14_yml_file"
+
   sudo cp -n ninja2/*.so.* /usr/local/lib/
   sudo ldconfig
 
@@ -190,12 +194,12 @@ EOF
 case "$1" in
   start)
     install
-    rm -rf new_ninja2.tar.gz  install.sh
+    rm -rf new_ninja2.tar.gz  install.sh ninja2/
     ;;
   *)
     wget -c --no-check-certificate https://github.com/ninja-cloudbuild/ninja2/releases/download/v2.0.1/new_ninja2.tar.gz
     tar -zxvf new_ninja2.tar.gz
     install
-    rm -rf new_ninja2.tar.gz  install.sh
+    rm -rf new_ninja2.tar.gz  install.sh ninja2/
     ;;
 esac
