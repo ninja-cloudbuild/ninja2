@@ -72,7 +72,7 @@ function install_dependencies {
         success "NFS共享规则已存在，跳过添加"
       fi
       
-      sudo apt-get install -y git cmake g++ 
+     
       #sudo apt-get update
       #sudo apt-get install -y git cmake g++ gcc googletest libgmock-dev libssl-dev pkg-config uuid-dev grpc++ libprotobuf-dev protobuf-compiler-grpc ninja-build libyaml-cpp-dev 
       ;;
@@ -190,12 +190,12 @@ EOF
 case "$1" in
   start)
     install
-    rm -rf new_ninja2.tar.gz ninja2/ install.sh
+    rm -rf new_ninja2.tar.gz  install.sh
     ;;
   *)
     wget -c --no-check-certificate https://github.com/ninja-cloudbuild/ninja2/releases/download/v2.0.1/new_ninja2.tar.gz
     tar -zxvf new_ninja2.tar.gz
     install
-    rm -rf new_ninja2.tar.gz ninja2/ install.sh
+    rm -rf new_ninja2.tar.gz  install.sh
     ;;
 esac
