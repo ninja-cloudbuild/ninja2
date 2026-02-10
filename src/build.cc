@@ -792,7 +792,7 @@ constexpr int proportion = 3; //Best result from benchmark
 
 struct CloudCommandRunner : public CommandRunner {
   explicit CloudCommandRunner(const BuildConfig& config)
-      : config_(config), remote_procs_(config.parallelism * proportion) {}
+      : config_(config), remote_procs_(config.parallelism * proportion), local_procs_() {}
   virtual ~CloudCommandRunner() {}
   virtual size_t CanRunMore() const override;
   virtual bool StartCommand(Edge* edge) override;
@@ -803,63 +803,99 @@ struct CloudCommandRunner : public CommandRunner {
   const BuildConfig& config_;
   RemoteProcessSet remote_procs_;
   map<const RemoteProcess*, Edge*> remoteproc_to_edge;
+  SubprocessSet local_procs_;
+  map<const Subprocess*, Edge*> localproc_to_edge;
+
+  std::vector<Edge*> local_queue_;
 };
 
 
 size_t CloudCommandRunner::CanRunMore() const {
-  size_t re_proc_number =
-      remote_procs_.running_.size() + remote_procs_.finished_.size();
+  size_t remote_limit = config_.parallelism * proportion;
+  size_t remote_active = remoteproc_to_edge.size();
+  size_t remote_capacity = (remote_active < remote_limit) ? (remote_limit - remote_active) : 0;
 
-  int64_t capacity = config_.parallelism - re_proc_number;
+  size_t local_limit = config_.parallelism;
+  size_t local_active = local_procs_.running_.size();
+  size_t local_capacity = (local_active < local_limit) ? (local_limit - local_active) : 0;
 
-  if (config_.max_load_average > 0.0f) {
-    int load_capacity = config_.max_load_average - GetLoadAverage();
-    if (load_capacity < capacity)
-      capacity = load_capacity;
-  }
-
-  if (capacity < 0)
-    capacity = 0;
-
-  if (capacity == 0 && remote_procs_.running_.empty())
-    // Ensure that we make progress.
-    capacity = 1;
-
-  return capacity;
+  return remote_capacity + local_capacity + 1;
 }
 
 
 bool CloudCommandRunner::StartCommand(Edge* edge) {
   string command = edge->EvaluateCommand();
   auto spawn = RemoteExecutor::RemoteSpawn::CreateRemoteSpawn(edge);
-  string cmd_rule =spawn->edge->rule().name();
-  RemoteProcess* remoteproc = remote_procs_.Add(spawn);
-  if (!remoteproc)
-    return false;
-  remoteproc_to_edge.insert(make_pair(remoteproc, edge));
+  // Check if the command can be executed remotely
+  if (spawn->can_remote) {
+    RemoteProcess* remoteproc = remote_procs_.Add(spawn);
+    if (remoteproc) {
+      remoteproc_to_edge.insert(make_pair(remoteproc, edge));
+      return true;
+    }
+  }
+  delete spawn;
+
+  if (local_procs_.running_.size() < (size_t)config_.parallelism) {
+    Subprocess* subproc = local_procs_.Add(command, edge->use_console());
+    if (!subproc) return false;
+    localproc_to_edge.insert(make_pair(subproc, edge));
+  } else {
+    local_queue_.push_back(edge);
+  }
   return true;
 }
 
 bool CloudCommandRunner::WaitForCommand(Result* result) {
   Subprocess* subproc;
   RemoteProcess* remoteproc;
-  SubprocessSet* tmp = new SubprocessSet();
-
   while (true) {
-    if ((remoteproc = remote_procs_.NextFinished()) != NULL)
-      break;
-    // Dowork 内部会更新 RemoteProcess 的 running_, finished_ 队列
-    if (remote_procs_.DoWork(tmp))
+    // Check for finished remote processes
+    if ((remoteproc = remote_procs_.NextFinished()) != NULL) {
+      result->status = remoteproc->Finish();
+      result->output = remoteproc->GetOutput();
+      auto e = remoteproc_to_edge.find(remoteproc);
+      if (e != remoteproc_to_edge.end()) {
+        result->edge = e->second;
+        remoteproc_to_edge.erase(e);
+      }
+      delete remoteproc;
+      return true;
+    }
+    
+    // Check for finished local processes
+    if ((subproc = local_procs_.NextFinished()) != NULL) {
+      result->status = subproc->Finish();
+      result->output = subproc->GetOutput();
+      auto e = localproc_to_edge.find(subproc);
+      if (e != localproc_to_edge.end()) {
+        result->edge = e->second;
+        localproc_to_edge.erase(e);
+      }
+      delete subproc;
+      if (!local_queue_.empty()) {
+        Edge* next_edge = local_queue_.front();
+        local_queue_.erase(local_queue_.begin());
+        
+        string cmd = next_edge->EvaluateCommand();
+        Subprocess* next_sub = local_procs_.Add(cmd, next_edge->use_console());
+        if (next_sub) {
+          localproc_to_edge.insert(make_pair(next_sub, next_edge));
+        }
+      }
+      return true;
+    }
+    
+    // Check if there are any active processes left
+    if (remoteproc_to_edge.empty() && localproc_to_edge.empty() && local_queue_.empty()) {
+      // No active processes, return false to indicate no command to wait for
+      return false;
+    }
+    
+    // Do work to update process statuses
+    if (remote_procs_.DoWork(&local_procs_))
       return false;
   }
-  assert(remoteproc != NULL);
-  result->status = remoteproc->Finish();
-  result->output = remoteproc->GetOutput();
-  auto e = remoteproc_to_edge.find(remoteproc);
-  result->edge = e->second;
-  remoteproc_to_edge.erase(e);
-  delete remoteproc;
-  delete tmp;
   return true;
 }
 
@@ -868,11 +904,19 @@ vector<Edge*> CloudCommandRunner::GetActiveEdges() {
   for (map<const RemoteProcess*, Edge*>::iterator e = remoteproc_to_edge.begin();
        e != remoteproc_to_edge.end(); ++e)
     edges.push_back(e->second);
+  for (map<const Subprocess*, Edge*>::iterator e = localproc_to_edge.begin();
+       e != localproc_to_edge.end(); ++e)
+    edges.push_back(e->second);
+  for (Edge* e : local_queue_) {
+    edges.push_back(e);
+  }
   return edges;
 }
 
 void CloudCommandRunner::Abort() {
   remote_procs_.Clear();
+  local_procs_.Clear();
+  local_queue_.clear();
 }
 
 #endif // CLOUD_BUILD_SUPPORT

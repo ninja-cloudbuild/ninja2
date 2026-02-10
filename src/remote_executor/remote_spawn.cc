@@ -108,27 +108,6 @@ bool RemoteSpawn::CanExecuteRemotelly(Edge* edge) {
   return false;
 }
 
-bool RemoteSpawn::CanCacheRemotelly(Edge* edge) {
-  if (!edge)
-    return false;
-  std::string command = edge->EvaluateCommand();
-  std::string rule = edge->rule().name();
-
-  if (config->rbe_config.local_only_rules.find(rule) != config->rbe_config.local_only_rules.end()){
-    return false;
-  }
-  for (auto &cmd:config->rbe_config.local_only_fuzzy){
-    if (command.find(cmd)!=std::string::npos || rule.find(cmd)!=std::string::npos){
-      return false;
-    }
-  }
-  for (auto& it : CompileCommandParser::SupportedRemoteExecuteCommands())
-    if (command.find(it) != std::string::npos)
-      return true;
-  
-  return false;
-}
-
 enum OptType { relaPath, absPath, symbol, option, toolPath, errPath = -1 };
 
 OptType OptionType(const std::string& option) {
