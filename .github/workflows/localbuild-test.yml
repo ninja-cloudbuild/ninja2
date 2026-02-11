@@ -17,7 +17,7 @@ jobs:
     steps:
       # 1. 检出代码
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v6
 
       # 2. 配置 apt 使用更快的镜像源（可选，根据地域选择）
       - name: Configure apt to use faster mirrors
